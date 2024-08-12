@@ -1,0 +1,9 @@
+{
+    "altapay": {
+        "gateway": {
+            "title": "Betalningsinformation",
+            "orderNumber": "Ordernummer:",
+            "totalPrice": "Totalpris:"
+        }
+    }
+}

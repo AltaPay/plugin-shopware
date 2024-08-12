@@ -1,0 +1,62 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/shopware/platform/trunk/src/Core/System/SystemConfig/Schema/config.xsd">
+    <card>
+        <title>AltaPay Settings</title>
+        <title lang="da-DK">AltaPay Indstillinger</title>
+        <title lang="de-DE">AltaPay Einstellungen</title>
+        <input-field type="single-select">
+            <name>paymentEnvironment</name>
+            <label>Payment Environment</label>
+            <label lang="da-DK">Betalingsmiljø</label>
+            <label lang="de-DE">Zahlungsumgebung</label>
+            <options>
+                <option>
+                    <id>https://testgateway.altapaysecure.com/merchant/API/</id>
+                    <name>Test environment</name>
+                    <name lang="da-DK">Testmiljø</name>
+                    <name lang="de-DE">Test Umgebung</name>
+                </option>
+                <option>
+                    <id>https://$PLACEHOLDER$.altapaysecure.com/merchant/API/</id>
+                    <name>Production environment</name>
+                    <name lang="da-DK">Produktionsmiljø</name>
+                    <name lang="de-DE">Produktionsumgebung</name>
+                </option>
+            </options>
+            <defaultValue>https://testgateway.altapaysecure.com/merchant/API/</defaultValue>
+        </input-field>
+        <input-field>
+            <name>shopName</name>
+            <required>true</required>
+            <label>AltaPay ShopName</label>
+        </input-field>
+        <input-field>
+            <name>username</name>
+            <required>true</required>
+            <label>AltaPay Username</label>
+        </input-field>
+        <input-field type="password">
+            <name>password</name>
+            <required>true</required>
+            <label>AltaPay Password</label>
+        </input-field>
+    </card>
+    <card>
+        <title>Shopware Order</title>
+        <input-field type="bool">
+            <name>keepOrderOpen</name>
+            <label>Keep order in open state</label>
+            <helpText>Don't change the order state to Processing when customer has completed the payment flow</helpText>
+            <default>false</default>
+        </input-field>
+    </card>
+
+    <card>
+        <title>Payment gateway</title>
+        <component name="sw-media-field">
+            <name>paymentGatewayMedia</name>
+            <label>Image for gateway</label>
+        </component>
+    </card>
+</config>

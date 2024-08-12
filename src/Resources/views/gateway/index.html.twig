@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+{% block altapay_head %}
+<html lang="{{ gatewayData.languageCode }}">
+<head>
+    {% block altapay_head_title %}
+        <title>{{ gatewayData.title }}</title>
+    {% endblock %}
+
+    {% block altapay_head_style_header %}
+        <style>
+            body {
+                margin: 0;
+                font-family: Sans-Serif;
+                background-color: #f9f9f9;
+            }
+            .header-minimal {
+                width: 100%;
+                color: #000;
+                display: flex;
+                height: 150px;
+                justify-content: center;
+                background-color: #dedede;
+            }
+            .header-minimal-logo {
+                max-width: 200px;
+                height: auto;
+                margin: auto;
+            }
+            .header-minimal-headline {
+                margin: auto;
+            }
+            .header-minimal-logo img {
+                width: 100%;
+            }
+        </style>
+    {% endblock %}
+    {% block altapay_head_style_form %}
+        <style>
+            .content-wrapper {
+                max-width: 400px;
+                margin: 0 auto;
+                background-color: #fff;
+                padding: 20px 50px;
+            }
+            .heading-wrapper {
+                margin-top: 20px;
+            }
+            .heading-title {
+                margin: 30px 0 50px;
+            }
+            .pensio_payment_form_label_cell {
+                font-weight: bold;
+                font-size: 14px;
+            }
+            .pensio_payment_form_row {
+                margin-top: 20px;
+            }
+            #CreditCard {
+                width: 100%;
+                overflow: hidden;
+            }
+            #cardholderNameInput,
+            #creditCardNumberInput {
+                width: 100%;
+            }
+            #selectCardLabel,
+            #creditCardTypeSecondIcon,
+            #creditCardTypeIcon {
+                display: none;
+            }
+            #pensioCreditCardPaymentSubmitButton,
+            #submitbutton,
+            #MobilePaymentFormSubmit {
+                border-radius: 0;
+                padding: 10px 20px;
+                width: 100%;
+                border: none;
+                margin-top: 30px;
+            }
+            td.pensio_payment_form_label_cell {
+                vertical-align: top;
+            }
+            td.pensio_payment_form_input_cell {
+                display: flex;
+                flex-direction: column;
+            }
+            #pensioCreditCardPaymentSubmitButton:not(:disabled),
+            #submitbutton:not(:disabled),
+            #MobilePaymentFormSubmit:not(:disabled){
+                background-color: #40ba8d;
+                color: #fff;
+            }
+            #pensioCreditCardPaymentSubmitButton:not(:disabled):hover,
+            #submitbutton:not(:disabled):hover,
+            #MobilePaymentFormSubmit:not(:disabled):hover{
+                background-color: #47d5a0;
+            }
+            #pensioCreditCardPaymentSubmitButton:disabled,
+            #MobilePaymentFormSubmit:disabled{
+                background-color: #dedede;
+            }
+            #cvcInput {
+                width: 50%;
+            }
+            .pensio_payment_form_input_cell select {
+                width: 40%;
+                padding: 5px 0;
+            }
+            .custom-label {
+                font-size: 13px;
+            }
+            input[type="text"],
+            input[type="tel"],
+            select {
+                border-width: 0 0 1px;
+                border-color: #000;
+                padding-inline: 0;
+            }
+            input[type="text"]:focus-visible,
+            input[type="tel"]:focus-visible,
+            select:focus-visible {
+                outline: none;
+            }
+            @media screen and (max-width: 425px) {
+                .content-wrapper {
+                    padding: 20px;
+                }
+            }
+            #PensioJavascriptDisabledSurchargeNotice,
+            #invalid_cvc,
+            #invalid_cardholdername {
+                color: red;
+                background-color: white;
+            }
+        </style>
+    {% endblock %}
+</head>
+{% endblock %}
+
+{% block altapay_body %}
+    <body>
+    {% block altapay_body_image %}
+        {% block altapay_layout_header %}
+            {% if gatewayData.media !== '' %}
+                <header class="header-minimal">
+                    {% if gatewayData.mediaUrl is not null %}
+                        {% block altapay_layout_header_minimal_logo %}
+                            <div class="header-minimal-logo">
+                                <img src="{{ gatewayData.mediaUrl }}"
+                                     alt="logo"
+                                     class="header-logo-main-img">
+                            </div>
+                        {% endblock %}
+                    {% else %}
+                        {% block altapay_layout_header_minimal_headline %}
+                            <div class="header-minimal-headline">
+                                <h1>{{ gatewayData.shopName }}</h1>
+                            </div>
+                        {% endblock %}
+                    {% endif %}
+                </header>
+            {% endif %}
+        {% endblock %}
+    {% endblock %}
+    {% block altapay_body_content %}
+        <div class="content-wrapper">
+            {% block altapay_body_content_heading %}
+                <div class="heading-wrapper">
+                    <h2 class="heading-title"> {{ gatewayData.title }} </h2>
+                </div>
+            {% endblock %}
+            {% block altapay_body_content_info %}
+                <div class="info-wrapper">
+                    {% block altapay_body_content_ordernumber %}
+                        <p class="custom-label">
+                            <span class="pensio_payment_form_label_cell">{{ gatewayData.orderNumberSnippet }}</span> {{ gatewayData.shopOrderId }}
+                        </p>
+                    {% endblock %}
+                    {% block altapay_body_content_price %}
+                        <p class="custom-label">
+                            <span class="pensio_payment_form_label_cell">{{ gatewayData.totalPriceSnippet }}</span> {{ gatewayData.symbol }} {{ gatewayData.totalAmount }}
+                        </p>
+                    {% endblock %}
+
+                </div>
+            {% endblock %}
+            {% block altapay_body_form %}
+                <form id="PensioPaymentForm">
+                    <!--All content in here will be replaced by the actual payment form-->
+                </form>
+            {% endblock %}
+        </div>
+    {% endblock %}
+    </body>
+{% endblock %}
+</html>

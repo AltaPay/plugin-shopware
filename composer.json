@@ -1,0 +1,47 @@
+{
+    "name": "wexo/plugin-altapay",
+    "description": "AltaPay plugin for Shopware 6",
+    "type": "shopware-platform-plugin",
+    "license": "proprietary",
+    "version": "1.2.7",
+    "authors": [
+        {
+            "name": "WEXO A/S",
+            "homepage": "https://www.wexo.dk/"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Wexo\\AltaPay\\": "src/"
+        }
+    },
+    "require": {
+        "ext-simplexml": "*",
+        "shopware/core": "~6.5.0"
+    },
+    "extra": {
+        "shopware-plugin-class": "Wexo\\AltaPay\\WexoAltaPay",
+        "plugin-icon": "src/Resources/config/plugin.png",
+        "copyright": "(c) by WEXO A/S",
+        "label": {
+            "da-DK": "AltaPay",
+            "en-GB": "AltaPay",
+            "de-DE": "AltaPay"
+        },
+        "description": {
+            "da-DK": "Giver mulighed for at bruge AltaPay som betalingsudbyder i Shopware",
+            "en-GB": "Enables using AltaPay as payment provider in Shopware",
+            "de-DE": "Ermöglicht die Nutzung von AltaPay als Zahlungsanbieter in Shopware"
+        },
+        "manufacturerLink": {
+            "dk-DK": "https://www.wexo.dk",
+            "en-GB": "https://www.wexo.dk",
+            "de-DE": "https://www.wexo.dk"
+        },
+        "supportLink": {
+            "da-DK": "https://www.wexo.dk/shopware-support",
+            "en-GB": "https://www.wexo.dk/shopware-support",
+            "de-DE": "https://www.wexo.dk/shopware-support"
+        }
+    }
+}
