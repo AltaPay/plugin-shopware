@@ -84,15 +84,6 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
                 (string)$altaPayResponse->Header->ErrorMessage,
             );
         }
-        $order->changeCustomFields([
-            self::ALTAPAY_PAYMENT_ID_CUSTOM_FIELD => (string)$altaPayResponse->Body->PaymentRequestId
-        ]);
-        $this->orderRepository->update([
-            [
-                'id' => $order->getId(),
-                'customFields' => $order->getCustomFields()
-            ]
-        ], $salesChannelContext->getContext());
         return new RedirectResponse((string)$altaPayResponse->Body->Url, 302, [
             // In case someone wants to embed a payment window
             'X-Dynamic-JavaScript-Url' => (string)$altaPayResponse->DynamicJavascriptUrl
@@ -146,6 +137,13 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
                     );
                 }
 
+                if (in_array((string)$result->Body->Transactions->Transaction->TransactionStatus, ['captured', 'bank_payment_finalized'])) {
+                    $this->orderTransactionStateHandler->paid(
+                        $transaction->getId(),
+                        $salesChannelContext->getContext()
+                    );
+                }
+
                 break;
             case "Cancel":
                 throw new CustomerCanceledAsyncPaymentException(
@@ -166,11 +164,13 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
         $altaPayTransactionId = (string)$result->Body->Transactions->Transaction->TransactionId;
         $altaPayPaymentSchemeName= (string)$result->Body->Transactions->Transaction->PaymentSchemeName;
         $altaPayPaymentNature= (string)$result->Body->Transactions->Transaction->PaymentNature;
+        $altaPayPaymentId= (string)$result->Body->Transactions->Transaction->PaymentId;
 
         $order->changeCustomFields([
             self::ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD => $altaPayTransactionId,
             self::ALTAPAY_TRANSACTION_PAYMENT_SCHEME_NAME_CUSTOM_FIELD => $altaPayPaymentSchemeName,
             self::ALTAPAY_TRANSACTION_PAYMENT_NATURE_CUSTOM_FIELD => $altaPayPaymentNature,
+            self::ALTAPAY_PAYMENT_ID_CUSTOM_FIELD => $altaPayPaymentId
         ]);
         $this->orderRepository->update([
             [
@@ -232,7 +232,7 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
         foreach ($order->getLineItems() as $lineItem) {
             $unitTaxRate = $lineItem->getPrice()?->getCalculatedTaxes()->getAmount() / $lineItem->getQuantity();
 
-            $unitPrice = ($lineItem->getPrice()?->getUnitPrice() ?? 0.0) - ($unitTaxRate ?? 0.0);
+            $unitPrice = round(($lineItem->getPrice()?->getUnitPrice() ?? 0.0) - ($unitTaxRate ?? 0.0), 3);
             $taxAmount = $lineItem->getPrice()?->getCalculatedTaxes()->getAmount() ?? 0.0;
 
             $discount = $lineItem->getPrice()?->getListPrice()?->getDiscount() ?? 0.0;
@@ -267,8 +267,8 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
             };
         }
         foreach ($order->getDeliveries() as $delivery) {
-            $netUnitPrice = $delivery->getShippingCosts()->getUnitPrice()
-                - $delivery->getShippingCosts()->getCalculatedTaxes()->getAmount();
+            $netUnitPrice = round($delivery->getShippingCosts()->getUnitPrice()
+                - $delivery->getShippingCosts()->getCalculatedTaxes()->getAmount(), 3);
 
             $taxAmount = $delivery->getShippingCosts()->getCalculatedTaxes()->getAmount();
 
@@ -289,6 +289,26 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
             ];
         }
 
+        $totalAmount = round($order->getAmountTotal(), 2);
+        $orderLinesTotal = 0;
+        foreach ($orderLines as $orderLine) {
+            $orderLinePriceWithTax = ($orderLine['unitPrice'] * $orderLine['quantity']) + $orderLine['taxAmount'];
+            $orderLinesTotal += $orderLinePriceWithTax - ($orderLinePriceWithTax * ($orderLine['discount'] / 100));
+        }
+
+        $totalCompensationAmount = round(($totalAmount - $orderLinesTotal), 3);
+        if ($totalCompensationAmount != 0) {
+            $orderLines[] = [
+                'description' => "compensation",
+                'itemId' => "comp-total",
+                'quantity' => 1,
+                'unitPrice' => $totalCompensationAmount,
+                'taxAmount' => 0,
+                'discount' => 0,
+                'goodsType' => 'handling'
+            ];
+        }
+
         $customer = $order->getOrderCustomer();
 
         $gatewayStyleUrl = $this->router->generate(
@@ -300,6 +320,12 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
 
         $gatewayErrorUrl = $this->router->generate(
             name: 'altapay.gateway.error',
+            parameters: $params,
+            referenceType: UrlGeneratorInterface::ABSOLUTE_URL
+        );
+
+        $gatewayNotificationUrl = $this->router->generate(
+            name: 'altapay.gateway.notification',
             parameters: $params,
             referenceType: UrlGeneratorInterface::ABSOLUTE_URL
         );
@@ -326,13 +352,14 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
                 'terminal' => $terminal,
                 'language' => $languageCode ?? 'en',
                 'shop_orderid' => $order->getOrderNumber(),
-                'amount' => $order->getAmountTotal(),
+                'amount' => $totalAmount,
                 'currency' => $order->getCurrency()->getIsoCode(),
                 'config' => [
                     'callback_ok' => $returnUrl,
                     'callback_fail' => $gatewayErrorUrl,
                     'callback_open' => $returnUrl,
                     'callback_form' => $gatewayStyleUrl,
+                    'callback_notification' => $gatewayNotificationUrl,
                 ],
                 'orderLines' => $orderLines,
                 'customer_info' => [

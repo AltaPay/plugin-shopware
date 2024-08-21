@@ -116,6 +116,7 @@ class CallbackController extends StorefrontController
 
     #[Route(
         path: '/altapay/callback/notification',
+        name: 'altapay.gateway.notification',
         defaults: ['auth_required' => false],
         methods: ['POST']
     )]
@@ -126,13 +127,12 @@ class CallbackController extends StorefrontController
         }
         try {
             $result = new SimpleXMLElement($request->get('xml'));
-            $orderNumber = (string)$result?->APIResponse?->Body?->Transactions?->Transaction[0]?->ShopOrderId;
-            $paymentId = (string)$result?->APIResponse?->Body?->Transactions?->Transaction[0]?->PaymentId;
+            $orderNumber = (string)$result?->Body?->Transactions?->Transaction?->ShopOrderId;
             if (!$orderNumber) {
                 throw new Exception();
             }
         } catch (Exception) {
-            return new Response('Invalid request', 400);
+            return new Response('Error processing request', 400);
         }
         $criteria = (new Criteria())
             ->addFilter(new EqualsFilter('orderNumber', $orderNumber));
@@ -140,12 +140,11 @@ class CallbackController extends StorefrontController
             ->addSorting(new FieldSorting('createdAt', FieldSorting::DESCENDING));
         /** @var OrderEntity|null $order */
         $order = $this->orderRepository->search($criteria, $salesChannelContext->getContext())->first();
-        if (!$order ||
-            ($order->getCustomFields()[PaymentService::ALTAPAY_PAYMENT_ID_CUSTOM_FIELD] ?? null) !== $paymentId) {
-            return new Response('Invalid request', 400);
+        if (!$order) {
+            return new Response('Order not found in the CMS', 400);
         }
         $transaction = $order->getTransactions()->first();
         $this->paymentService->transactionCallback($result, $order, $transaction, $salesChannelContext);
-        return new Response(null, 204);
+        return new Response("Acknowledged", 200);
     }
 }
