@@ -5,6 +5,9 @@ TARGET_DIR="altapay-master"
 DIRECTORIES=("src" "ci")  # List of directories to copy
 FILES=("composer.json" ".gitlab-ci.yml" ".gitignore")  # List of files to copy
 
+# Remove zip file
+rm "${TARGET_DIR}.zip"
+
 # Create the target directory
 mkdir -p "$TARGET_DIR"
 
