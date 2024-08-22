@@ -1,4 +1,16 @@
 .idea
-vendor
 .git
 composer.lock
+.idea/
+.vscode/
+/vendor/
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+ehthumbs.db
+Thumbs.db
+altapay-master.zip
