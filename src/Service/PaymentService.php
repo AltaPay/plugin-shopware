@@ -296,13 +296,13 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
             $orderLinesTotal += $orderLinePriceWithTax - ($orderLinePriceWithTax * ($orderLine['discount'] / 100));
         }
 
-        $totalCompensationAmount = round(($totalAmount - $orderLinesTotal), 3);
-        if ($totalCompensationAmount != 0) {
+        $compensationAmount = round(($totalAmount - $orderLinesTotal), 3);
+        if ($compensationAmount != 0) {
             $orderLines[] = [
                 'description' => "compensation",
-                'itemId' => "comp-total",
+                'itemId' => "comp-amount",
                 'quantity' => 1,
-                'unitPrice' => $totalCompensationAmount,
+                'unitPrice' => $compensationAmount,
                 'taxAmount' => 0,
                 'discount' => 0,
                 'goodsType' => 'handling'
