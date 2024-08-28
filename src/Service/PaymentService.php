@@ -128,17 +128,12 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
                     $salesChannelContext->getContext()
                 );
 
-                if (in_array((string)$result->Body->Transactions->Transaction->TransactionStatus, ['preauth', 'invoice_initialized'])
-                    and $result->Body->Transactions->Transaction->ReservedAmount > 0
-                ) {
+                if ($result->Body->Transactions->Transaction->ReservedAmount > 0) {
                     $this->orderTransactionStateHandler->authorize(
                         $transaction->getId(),
                         $salesChannelContext->getContext()
                     );
-                }
-
-                if (in_array((string)$result->Body->Transactions->Transaction->TransactionStatus, ['captured', 'bank_payment_finalized'])
-                    and $result->Body->Transactions->Transaction->CapturedAmount > 0) {
+                } elseif ($result->Body->Transactions->Transaction->CapturedAmount > 0) {
                     $this->orderTransactionStateHandler->paid(
                         $transaction->getId(),
                         $salesChannelContext->getContext()
