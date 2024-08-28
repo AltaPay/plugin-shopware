@@ -103,13 +103,28 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
         );
     }
 
+    /**
+     * Called in case ok/open/notification/fail callback is received.
+     * Marks authorized/paid if gateway transaction's ReservedAmount/CapturedAmount > 0.
+     * Ignores if Result is Open.
+     * Marks cancelled/failed based on Result in the xml body.
+     */
+
     public function transactionCallback(
         SimpleXMLElement $result,
         OrderEntity $order,
         OrderTransactionEntity $transaction,
         SalesChannelContext $salesChannelContext
     ): void {
-        switch ((string)$result->Body?->Result) {
+        $status = (string)$result->Body?->Result;
+        if ($result->Body->Transactions->Transaction->ReservedAmount > 0
+            ||
+            $result->Body->Transactions->Transaction->CapturedAmount > 0) {
+            $status = "Success";
+        }
+        switch ($status) {
+            case "Open":
+                break;
             case "Success":
                 // Delete cart when either customer or AltaPay reaches this page.
                 $this->cartPersister->delete(
