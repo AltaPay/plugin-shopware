@@ -117,9 +117,7 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
         SalesChannelContext $salesChannelContext
     ): void {
         $status = (string)$result->Body?->Result;
-        if ($result->Body->Transactions->Transaction->ReservedAmount > 0
-            ||
-            $result->Body->Transactions->Transaction->CapturedAmount > 0) {
+        if ($result->Body->Transactions->Transaction->ReservedAmount > 0) {
             $status = "Success";
         }
         switch ($status) {
@@ -148,7 +146,9 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
                         $transaction->getId(),
                         $salesChannelContext->getContext()
                     );
-                } elseif ($result->Body->Transactions->Transaction->CapturedAmount > 0) {
+                }
+
+                if ($result->Body->Transactions->Transaction->CapturedAmount > 0) {
                     $this->orderTransactionStateHandler->paid(
                         $transaction->getId(),
                         $salesChannelContext->getContext()
