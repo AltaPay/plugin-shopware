@@ -144,7 +144,8 @@ class CallbackController extends StorefrontController
             return new Response('Order not found in the CMS', 400);
         }
         $transaction = $order->getTransactions()->first();
-        $this->paymentService->transactionCallback($result, $order, $transaction, $salesChannelContext);
+        $allRequestParams = array_merge($request->query->all(), $request->request->all());
+        $this->paymentService->transactionCallback($result, $order, $transaction, $salesChannelContext, $allRequestParams);
         return new Response("Acknowledged", 200);
     }
 }
