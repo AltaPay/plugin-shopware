@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ## 1.0.1
 ### Added
 - Implement `callback notification`.
+- Implement auto capture functionality.
 ### Fixed
 - Update order transaction status as paid upon receiving captured transaction status from gateway in callbacks.
 - Save correct AltaPay Transaction Payment ID upon receiving callbacks instead of upon createPaymentRequest.
