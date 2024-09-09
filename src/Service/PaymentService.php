@@ -123,7 +123,9 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
         array $allRequestParams
     ): void {
         $status = (string)$result->Body?->Result;
-        if ($result->Body->Transactions->Transaction->ReservedAmount > 0) {
+        if ($allRequestParams['type'] == 'paymentAndCapture' and $result->Body->Transactions->Transaction->CapturedAmount > 0) {
+            $status = "Success";
+        } elseif ($result->Body->Transactions->Transaction->ReservedAmount > 0) {
             $status = "Success";
         }
         switch ($status) {
