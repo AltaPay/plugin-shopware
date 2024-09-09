@@ -91,6 +91,22 @@ class CallbackController extends StorefrontController
     }
 
     #[Route(
+        path: '/altapay/redirect',
+        name: 'altapay.gateway.redirect',
+        defaults: ['auth_required' => false],
+        methods: ['POST']
+    )]
+    public function gatewayRedirect(Request $request, SalesChannelContext $salesChannelContext): Response
+    {
+        $data = [
+            'languageCode' => $request->get('language'),
+            'title' => $this->translator->trans('altapay.gateway.title'),
+        ];
+
+        return $this->render('@WexoAltaPay/gateway/redirect.html.twig', ['gatewayData' => $data]);
+    }
+
+    #[Route(
         path: '/altapay/getError',
         name: 'altapay.gateway.error',
         defaults: ['auth_required' => false],

@@ -355,6 +355,11 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
             referenceType: UrlGeneratorInterface::ABSOLUTE_URL
         );
 
+        $gatewayRedirectUrl = $this->router->generate(
+            name: 'altapay.gateway.redirect',
+            referenceType: UrlGeneratorInterface::ABSOLUTE_URL
+        );
+
         $billingAddress = $order->getBillingAddress();
         $shippingAddress = $order->getDeliveries()->getShippingAddress()->first();
 
@@ -386,6 +391,7 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
                     'callback_open' => $returnUrl,
                     'callback_form' => $gatewayStyleUrl,
                     'callback_notification' => $gatewayNotificationUrl,
+                    'callback_redirect' => $gatewayRedirectUrl,
                 ],
                 'orderLines' => $orderLines,
                 'customer_info' => [

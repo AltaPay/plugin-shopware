@@ -62,6 +62,12 @@ class SalesChannelAuthenticationListener implements EventSubscriberInterface
             return;
         }
 
+        $route = $request->attributes->get('_route');
+
+        if ($route === 'altapay.gateway.redirect') {
+            return;
+        }
+
         $controller = $event->getController();
         if (is_array($controller)) {
             $controller = $controller[0] ?? null;
