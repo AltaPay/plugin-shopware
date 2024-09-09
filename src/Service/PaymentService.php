@@ -109,10 +109,11 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
     }
 
     /**
-     * Called in case ok/open/notification/fail callback is received.
+     * Called upon receiving ok,open,notification,fail callback.
      * Marks authorized/paid if gateway transaction's ReservedAmount/CapturedAmount > 0.
      * Ignores if Result is Open.
      * Marks cancelled/failed based on Result in the xml body.
+     * Does not perform capture on require_capture = 'true' when called from callback notification.
      */
 
     public function transactionCallback(
@@ -120,7 +121,8 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
         OrderEntity $order,
         OrderTransactionEntity $transaction,
         SalesChannelContext $salesChannelContext,
-        array $allRequestParams
+        array $allRequestParams,
+        bool $is_notification = false
     ): void {
         $status = (string)$result->Body?->Result;
         if ($allRequestParams['type'] == 'paymentAndCapture' and $result->Body->Transactions->Transaction->CapturedAmount > 0) {
@@ -154,7 +156,7 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
                         $transaction->getId(),
                         $salesChannelContext->getContext()
                     );
-                } elseif ($allRequestParams['type'] == 'paymentAndCapture' and $allRequestParams['require_capture'] == 'true') {
+                } elseif (!$is_notification and $allRequestParams['type'] == 'paymentAndCapture' and $allRequestParams['require_capture'] == 'true') {
                     $captureResponse = $this->captureReservation($order, $salesChannelContext->getSalesChannelId(), (string)$result->Body->Transactions->Transaction->TransactionId);
                     $captureResponseAsXml = new SimpleXMLElement($captureResponse->getBody()->getContents());
                     if ((string)$captureResponseAsXml->Body?->Result === "Success") {

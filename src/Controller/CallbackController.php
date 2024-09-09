@@ -161,7 +161,7 @@ class CallbackController extends StorefrontController
         }
         $transaction = $order->getTransactions()->first();
         $allRequestParams = array_merge($request->query->all(), $request->request->all());
-        $this->paymentService->transactionCallback($result, $order, $transaction, $salesChannelContext, $allRequestParams);
+        $this->paymentService->transactionCallback($result, $order, $transaction, $salesChannelContext, $allRequestParams, true);
         return new Response("Acknowledged", 200);
     }
 }
