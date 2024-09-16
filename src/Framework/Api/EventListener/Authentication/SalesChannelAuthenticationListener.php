@@ -62,6 +62,12 @@ class SalesChannelAuthenticationListener implements EventSubscriberInterface
             return;
         }
 
+        $route = $request->attributes->get('_route');
+
+        if ($route === 'altapay.gateway.redirect') {
+            return;
+        }
+
         $controller = $event->getController();
         if (is_array($controller)) {
             $controller = $controller[0] ?? null;
@@ -75,7 +81,7 @@ class SalesChannelAuthenticationListener implements EventSubscriberInterface
         if (!$orderNumber) {
             try {
                 $result = new SimpleXMLElement($request->get('xml'));
-                $orderNumber = (string)$result->APIResponse?->Body?->Transactions?->Transaction[0]?->ShopOrderId;
+                $orderNumber = (string)$result->Body?->Transactions?->Transaction?->ShopOrderId;
             } catch (Exception) {
             }
         }

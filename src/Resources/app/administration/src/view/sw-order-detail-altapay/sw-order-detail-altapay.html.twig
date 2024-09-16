@@ -23,9 +23,9 @@
     </sw-card-section>
     <sw-card-section v-if="transaction">
         <sw-container columns="1fr 1fr 1fr" gap="10px">
-            <sw-button :disabled="isLoading || !['open', 'in_progress'].includes(order.transactions[0].stateMachineState.technicalName)" @click="capture">{{ $tc("altaPay.capture") }}</sw-button>
+            <sw-button :disabled="isLoading || !['open', 'in_progress', 'authorized'].includes(order.transactions[0].stateMachineState.technicalName)" @click="capture">{{ $tc("altaPay.capture") }}</sw-button>
             <sw-button :disabled="isLoading || order.transactions[0].stateMachineState.technicalName !== 'paid'" @click="refund">{{ $tc("altaPay.refund") }}</sw-button>
-            <sw-button :disabled="isLoading || !['open', 'in_progress'].includes(order.transactions[0].stateMachineState.technicalName)" @click="cancel">{{ $tc("altaPay.cancel") }}</sw-button>
+            <sw-button :disabled="isLoading || !['open', 'in_progress', 'authorized'].includes(order.transactions[0].stateMachineState.technicalName)" @click="cancel">{{ $tc("altaPay.cancel") }}</sw-button>
         </sw-container>
     </sw-card-section>
 </sw-card>

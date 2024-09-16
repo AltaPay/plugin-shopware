@@ -39,6 +39,7 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
 {
     public const ALTAPAY_PAYMENT_ID_CUSTOM_FIELD = "wexoAltaPayPaymentId";
     public const ALTAPAY_TERMINAL_ID_CUSTOM_FIELD = "wexoAltaPayTerminalId";
+    public const ALTAPAY_AUTO_CAPTURE_CUSTOM_FIELD = "wexoAltaPayAutoCapture";
     public const ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD = "wexoAltaPayTransactionId";
     public const ALTAPAY_TRANSACTION_PAYMENT_SCHEME_NAME_CUSTOM_FIELD = "wexoAltapayTransactionPaymentSchemeName";
     public const ALTAPAY_TRANSACTION_PAYMENT_NATURE_CUSTOM_FIELD = "wexoAltapayTransactionPaymentNature";
@@ -63,13 +64,15 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
         $order = $transaction->getOrder();
         $paymentMethod = $transaction->getOrderTransaction()->getPaymentMethod();
         $terminal = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_TERMINAL_ID_CUSTOM_FIELD];
+        $paymentRequestType = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_AUTO_CAPTURE_CUSTOM_FIELD] ? 'paymentAndCapture' : 'payment';
 
         try {
             $altaPayResponse = $this->createPaymentRequest(
                 $order,
                 $transaction->getReturnUrl(),
                 $salesChannelContext,
-                $terminal
+                $terminal,
+                $paymentRequestType
             );
         } catch (GuzzleException $e) {
             throw new AsyncPaymentProcessException(
@@ -84,15 +87,6 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
                 (string)$altaPayResponse->Header->ErrorMessage,
             );
         }
-        $order->changeCustomFields([
-            self::ALTAPAY_PAYMENT_ID_CUSTOM_FIELD => (string)$altaPayResponse->Body->PaymentRequestId
-        ]);
-        $this->orderRepository->update([
-            [
-                'id' => $order->getId(),
-                'customFields' => $order->getCustomFields()
-            ]
-        ], $salesChannelContext->getContext());
         return new RedirectResponse((string)$altaPayResponse->Body->Url, 302, [
             // In case someone wants to embed a payment window
             'X-Dynamic-JavaScript-Url' => (string)$altaPayResponse->DynamicJavascriptUrl
@@ -104,21 +98,43 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
         Request $request,
         SalesChannelContext $salesChannelContext
     ): void {
+        $allRequestParams = array_merge($request->query->all(), $request->request->all());
         $this->transactionCallback(
             new SimpleXMLElement($request->get('xml')),
             $transaction->getOrder(),
             $transaction->getOrderTransaction(),
-            $salesChannelContext
+            $salesChannelContext,
+            $allRequestParams
         );
     }
+
+    /**
+     * Called upon receiving ok,open,notification,fail callback.
+     * Marks authorized/paid if gateway transaction's ReservedAmount/CapturedAmount > 0.
+     * Ignores if Result is Open.
+     * Marks cancelled/failed based on Result in the xml body.
+     * Does not perform capture on require_capture = 'true' when called from callback notification.
+     */
 
     public function transactionCallback(
         SimpleXMLElement $result,
         OrderEntity $order,
         OrderTransactionEntity $transaction,
-        SalesChannelContext $salesChannelContext
+        SalesChannelContext $salesChannelContext,
+        array $allRequestParams,
+        bool $is_notification = false
     ): void {
-        switch ((string)$result->Body?->Result) {
+        $status = (string)$result->Body?->Result;
+        if (
+            ($allRequestParams['type'] == 'paymentAndCapture' and $result->Body?->Transactions?->Transaction?->CapturedAmount > 0)
+            or
+            ($allRequestParams['type'] == 'payment' and $result->Body?->Transactions?->Transaction?->ReservedAmount > 0)
+        ) {
+            $status = "Success";
+        }
+        switch ($status) {
+            case "Open":
+                break;
             case "Success":
                 // Delete cart when either customer or AltaPay reaches this page.
                 $this->cartPersister->delete(
@@ -137,9 +153,21 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
                     $salesChannelContext->getContext()
                 );
 
-                if ((string)$result->Body->Transactions->Transaction->TransactionStatus === 'preauth'
-                    || (string)$result->Body->Transactions->Transaction->PaymentNature === 'Invoice'
-                ) {
+                if ($result->Body->Transactions->Transaction->CapturedAmount > 0) {
+                    $this->orderTransactionStateHandler->paid(
+                        $transaction->getId(),
+                        $salesChannelContext->getContext()
+                    );
+                } elseif (!$is_notification and $allRequestParams['type'] == 'paymentAndCapture' and $allRequestParams['require_capture'] == 'true') {
+                    $captureResponse = $this->captureReservation($order, $salesChannelContext->getSalesChannelId(), (string)$result->Body->Transactions->Transaction->TransactionId);
+                    $captureResponseAsXml = new SimpleXMLElement($captureResponse->getBody()->getContents());
+                    if ((string)$captureResponseAsXml->Body?->Result === "Success") {
+                        $this->orderTransactionStateHandler->paid(
+                            $transaction->getId(),
+                            $salesChannelContext->getContext()
+                        );
+                    }
+                } elseif ($result->Body->Transactions->Transaction->ReservedAmount > 0) {
                     $this->orderTransactionStateHandler->authorize(
                         $transaction->getId(),
                         $salesChannelContext->getContext()
@@ -166,11 +194,13 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
         $altaPayTransactionId = (string)$result->Body->Transactions->Transaction->TransactionId;
         $altaPayPaymentSchemeName= (string)$result->Body->Transactions->Transaction->PaymentSchemeName;
         $altaPayPaymentNature= (string)$result->Body->Transactions->Transaction->PaymentNature;
+        $altaPayPaymentId= (string)$result->Body->Transactions->Transaction->PaymentId;
 
         $order->changeCustomFields([
             self::ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD => $altaPayTransactionId,
             self::ALTAPAY_TRANSACTION_PAYMENT_SCHEME_NAME_CUSTOM_FIELD => $altaPayPaymentSchemeName,
             self::ALTAPAY_TRANSACTION_PAYMENT_NATURE_CUSTOM_FIELD => $altaPayPaymentNature,
+            self::ALTAPAY_PAYMENT_ID_CUSTOM_FIELD => $altaPayPaymentId
         ]);
         $this->orderRepository->update([
             [
@@ -226,13 +256,14 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
         OrderEntity $order,
         string      $returnUrl,
         SalesChannelContext $context,
-        string      $terminal
+        string      $terminal,
+        string $paymentRequestType
     ): SimpleXMLElement {
         $orderLines = [];
         foreach ($order->getLineItems() as $lineItem) {
             $unitTaxRate = $lineItem->getPrice()?->getCalculatedTaxes()->getAmount() / $lineItem->getQuantity();
 
-            $unitPrice = ($lineItem->getPrice()?->getUnitPrice() ?? 0.0) - ($unitTaxRate ?? 0.0);
+            $unitPrice = round(($lineItem->getPrice()?->getUnitPrice() ?? 0.0) - ($unitTaxRate ?? 0.0), 3);
             $taxAmount = $lineItem->getPrice()?->getCalculatedTaxes()->getAmount() ?? 0.0;
 
             $discount = $lineItem->getPrice()?->getListPrice()?->getDiscount() ?? 0.0;
@@ -267,8 +298,8 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
             };
         }
         foreach ($order->getDeliveries() as $delivery) {
-            $netUnitPrice = $delivery->getShippingCosts()->getUnitPrice()
-                - $delivery->getShippingCosts()->getCalculatedTaxes()->getAmount();
+            $netUnitPrice = round($delivery->getShippingCosts()->getUnitPrice()
+                - $delivery->getShippingCosts()->getCalculatedTaxes()->getAmount(), 3);
 
             $taxAmount = $delivery->getShippingCosts()->getCalculatedTaxes()->getAmount();
 
@@ -289,6 +320,26 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
             ];
         }
 
+        $totalAmount = round($order->getAmountTotal(), 2);
+        $orderLinesTotal = 0;
+        foreach ($orderLines as $orderLine) {
+            $orderLinePriceWithTax = ($orderLine['unitPrice'] * $orderLine['quantity']) + $orderLine['taxAmount'];
+            $orderLinesTotal += $orderLinePriceWithTax - ($orderLinePriceWithTax * ($orderLine['discount'] / 100));
+        }
+
+        $compensationAmount = round(($totalAmount - $orderLinesTotal), 3);
+        if ($compensationAmount != 0) {
+            $orderLines[] = [
+                'description' => "compensation",
+                'itemId' => "comp-amount",
+                'quantity' => 1,
+                'unitPrice' => $compensationAmount,
+                'taxAmount' => 0,
+                'discount' => 0,
+                'goodsType' => 'handling'
+            ];
+        }
+
         $customer = $order->getOrderCustomer();
 
         $gatewayStyleUrl = $this->router->generate(
@@ -301,6 +352,17 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
         $gatewayErrorUrl = $this->router->generate(
             name: 'altapay.gateway.error',
             parameters: $params,
+            referenceType: UrlGeneratorInterface::ABSOLUTE_URL
+        );
+
+        $gatewayNotificationUrl = $this->router->generate(
+            name: 'altapay.gateway.notification',
+            parameters: $params,
+            referenceType: UrlGeneratorInterface::ABSOLUTE_URL
+        );
+
+        $gatewayRedirectUrl = $this->router->generate(
+            name: 'altapay.gateway.redirect',
             referenceType: UrlGeneratorInterface::ABSOLUTE_URL
         );
 
@@ -323,16 +385,19 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
         $salesChannelId = $context->getSalesChannelId();
         $response = $this->getAltaPayClient($salesChannelId)->request('POST', 'createPaymentRequest', [
             'form_params' => [
+                'type'=> $paymentRequestType,
                 'terminal' => $terminal,
                 'language' => $languageCode ?? 'en',
                 'shop_orderid' => $order->getOrderNumber(),
-                'amount' => $order->getAmountTotal(),
+                'amount' => $totalAmount,
                 'currency' => $order->getCurrency()->getIsoCode(),
                 'config' => [
                     'callback_ok' => $returnUrl,
                     'callback_fail' => $gatewayErrorUrl,
                     'callback_open' => $returnUrl,
                     'callback_form' => $gatewayStyleUrl,
+                    'callback_notification' => $gatewayNotificationUrl,
+                    'callback_redirect' => $gatewayRedirectUrl,
                 ],
                 'orderLines' => $orderLines,
                 'customer_info' => [
@@ -373,12 +438,12 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
     /**
      * @see https://documentation.altapay.com/Content/Ecom/API/API%20Methods/captureReservation.htm
      */
-    public function captureReservation(OrderEntity $order, string $salesChannelId): ResponseInterface
+    public function captureReservation(OrderEntity $order, string $salesChannelId, string $transactionId = null): ResponseInterface
     {
         return $this->getAltaPayClient($salesChannelId)->request('POST', 'captureReservation', [
             'form_params' => [
                 'amount' => $order->getAmountTotal(),
-                'transaction_id' => $order->getCustomFields()[self::ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD]
+                'transaction_id' => $order->getCustomFields()[self::ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD]?:$transactionId
             ]
         ]);
     }

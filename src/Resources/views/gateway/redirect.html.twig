@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+{% block altapay_head %}
+<html lang="{{ gatewayData.languageCode }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    {% block altapay_head_title %}
+        <title>{{ gatewayData.title }}</title>
+    {% endblock %}
+
+    {% block altapay_head_style_header %}
+        <style>
+            body.redirect-page {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                margin: 0;
+            }
+        </style>
+    {% endblock %}
+</head>
+{% endblock %}
+
+{% block altapay_body %}
+    <body class="redirect-page">
+    <div id="PensioRedirectForm"></div>
+    </body>
+{% endblock %}
+</html>

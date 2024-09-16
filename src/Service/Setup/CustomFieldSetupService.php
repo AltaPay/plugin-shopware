@@ -153,6 +153,23 @@ class CustomFieldSetupService
             customFieldSetId: $fieldSetId,
             context: $context
         );
+
+        $this->addCustomField(
+            name: PaymentService::ALTAPAY_AUTO_CAPTURE_CUSTOM_FIELD,
+            type: CustomFieldTypes::SWITCH,
+            config: [
+                'label' => [
+                    'de-DE' => 'Automatische Erfassung',
+                    'en-GB' => 'Auto Capture',
+                    'da-DK' => 'Automatisk Optagelse',
+                ],
+                'customFieldPosition' => 2,
+                'defaultValue' => false,
+            ],
+            customFieldSetId: $fieldSetId,
+            context: $context
+        );
+
     }
 
     private function addCustomField(
