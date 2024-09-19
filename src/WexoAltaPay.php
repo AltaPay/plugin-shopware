@@ -11,6 +11,8 @@ use Shopware\Core\Framework\Plugin\Context\ActivateContext;
 use Shopware\Core\Framework\Plugin\Context\DeactivateContext;
 use Shopware\Core\Framework\Plugin\Context\UninstallContext;
 use Shopware\Core\Framework\Plugin\Context\UpdateContext;
+use Shopware\Core\System\SystemConfig\SystemConfigService;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Wexo\AltaPay\Service\PaymentService;
 use Wexo\AltaPay\Service\Setup\CustomFieldSetupService;
 
@@ -19,6 +21,8 @@ class WexoAltaPay extends Plugin
     public const ALTAPAY_FIELD_SET_NAME = "wexoAltaPay";
     public const ALTAPAY_PAYMENT_METHOD_FIELD_SET_NAME = "wexoAltaPayPaymentMethod";
     public const ALTAPAY_CART_TOKEN = "wexoAltaPayCartToken";
+    public const ALTAPAY_PLUGIN_VERSION = '1.2.9';
+    public const ALTAPAY_PLUGIN_NAME = 'WexoAltaPay';
 
     public function update(UpdateContext $updateContext): void
     {
@@ -79,5 +83,41 @@ class WexoAltaPay extends Plugin
                 'active' => $active,
             ]
         ], $context);
+    }
+
+    /**
+     * @param ContainerInterface $container
+     * @return string
+     */
+    public static function getShopwareVersionFromComposer(ContainerInterface $container): string
+    {
+        // Get the kernel instance
+        $kernel = $container->get('kernel');
+
+        // Get the project root directory
+        $projectDir = $kernel->getProjectDir();
+
+        // Build the path to the composer.lock file
+        $composerLockPath = $projectDir . '/composer.lock';
+
+        if (file_exists($composerLockPath)) {
+            $composerLock = json_decode(file_get_contents($composerLockPath), true);
+
+            foreach ($composerLock['packages'] as $package) {
+                if ($package['name'] === 'shopware/core' || $package['name'] === 'shopware/platform') {
+                    return $package['version'];
+                }
+            }
+        }
+
+        return 'Unknown';
+    }
+
+    /**
+     * Get the Shopware Shop Name.
+     */
+    public static function getShopName(SystemConfigService $systemConfigService, string $salesChannelId): string
+    {
+        return $systemConfigService->get('core.basicInformation.shopName', $salesChannelId) ?? 'Unknown';
     }
 }
