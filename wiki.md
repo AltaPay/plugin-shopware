@@ -91,7 +91,7 @@ be provided by AltaPay.
 
     ![shopware_show_payment_method_on_checkout.png](Docs/Configuration/shopware_show_payment_method_on_checkout.png)
 
-15. Choose the payment method and click Save button in the top-right corner. If the payment methods were configured correctly, you'll notice that in the list the payment method name has been postfixed with `AltaPay` separated by a bar.
+15. Choose the payment method and click Save button in the top-right corner.
 
     ![shopware_verify_payment_method.png](Docs/Configuration/shopware_verify_payment_method.png)
 
