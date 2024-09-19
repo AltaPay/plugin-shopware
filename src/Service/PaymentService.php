@@ -83,7 +83,7 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
                 $e
             );
         }
-        if (!$altaPayResponse->Body->Result) {
+        if (!$altaPayResponse->Body?->Result) {
             throw new AsyncPaymentProcessException(
                 $transaction->getOrderTransaction()->getId(),
                 (string)$altaPayResponse->Header->ErrorMessage,
