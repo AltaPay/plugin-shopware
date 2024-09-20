@@ -2,12 +2,12 @@
     "name": "wexo/plugin-altapay",
     "description": "AltaPay plugin for Shopware 6",
     "type": "shopware-platform-plugin",
-    "license": "proprietary",
-    "version": "1.2.7",
+    "license": "MIT",
+    "version": "1.2.9",
     "authors": [
         {
-            "name": "WEXO A/S",
-            "homepage": "https://www.wexo.dk/"
+            "name": "AltaPay A/S",
+            "homepage": "https://www.altapay.com/"
         }
     ],
     "autoload": {
@@ -22,7 +22,7 @@
     "extra": {
         "shopware-plugin-class": "Wexo\\AltaPay\\WexoAltaPay",
         "plugin-icon": "src/Resources/config/plugin.png",
-        "copyright": "(c) by WEXO A/S",
+        "copyright": "(c) by AltaPay A/S",
         "label": {
             "da-DK": "AltaPay",
             "en-GB": "AltaPay",
@@ -34,14 +34,14 @@
             "de-DE": "Ermöglicht die Nutzung von AltaPay als Zahlungsanbieter in Shopware"
         },
         "manufacturerLink": {
-            "dk-DK": "https://www.wexo.dk",
-            "en-GB": "https://www.wexo.dk",
-            "de-DE": "https://www.wexo.dk"
+            "dk-DK": "https://www.altapay.com",
+            "en-GB": "https://www.altapay.com",
+            "de-DE": "https://www.altapay.com"
         },
         "supportLink": {
-            "da-DK": "https://www.wexo.dk/shopware-support",
-            "en-GB": "https://www.wexo.dk/shopware-support",
-            "de-DE": "https://www.wexo.dk/shopware-support"
+            "da-DK": "https://github.com/AltaPay/plugin-shopware/wiki",
+            "en-GB": "https://github.com/AltaPay/plugin-shopware/wiki",
+            "de-DE": "https://github.com/AltaPay/plugin-shopware/wiki"
         }
     }
 }

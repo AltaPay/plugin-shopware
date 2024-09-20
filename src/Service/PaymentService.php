@@ -25,6 +25,7 @@ use Shopware\Core\System\Language\LanguageEntity;
 use Shopware\Core\System\SalesChannel\SalesChannelContext;
 use Shopware\Core\System\SystemConfig\SystemConfigService;
 use SimpleXMLElement;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
@@ -52,7 +53,8 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
         protected readonly EntityRepository $orderAddressRepository,
         protected readonly RouterInterface $router,
         protected readonly EntityRepository $languageRepository,
-        protected readonly AbstractCartPersister $cartPersister
+        protected readonly AbstractCartPersister $cartPersister,
+        protected readonly ContainerInterface $container
     ) {
     }
 
@@ -81,7 +83,7 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
                 $e
             );
         }
-        if (!$altaPayResponse->Body->Result) {
+        if (!$altaPayResponse->Body?->Result) {
             throw new AsyncPaymentProcessException(
                 $transaction->getOrderTransaction()->getId(),
                 (string)$altaPayResponse->Header->ErrorMessage,
@@ -420,6 +422,13 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
                     'billing_postal' => $billingAddress->getZipcode(),
                     'billing_country' => $billingAddress->getCountry()->getIso(),
                 ],
+                'transaction_info' => [
+                    'ecomPlatform' => 'Shopware',
+                    'ecomVersion' => WexoAltaPay::getShopwareVersionFromComposer($this->container),
+                    'ecomPluginName' => WexoAltaPay::ALTAPAY_PLUGIN_NAME,
+                    'ecomPluginVersion' => WexoAltaPay::ALTAPAY_PLUGIN_VERSION,
+                    'otherInfo' => WexoAltaPay::getShopName($this->systemConfigService, $salesChannelId),
+                ]
             ]
         ]);
         return new SimpleXMLElement($response->getBody()->getContents());

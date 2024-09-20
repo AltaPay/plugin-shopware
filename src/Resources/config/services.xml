@@ -20,6 +20,7 @@
             <argument type="service" id="router.default"/>
             <argument type="service" id="language.repository"/>
             <argument type="service" id="Shopware\Core\Checkout\Cart\CartPersister"/>
+            <argument type="service" id="service_container"/>
             <tag name="shopware.payment.method.async" />
         </service>
         <service id="Wexo\AltaPay\Controller\CallbackController" public="true">
