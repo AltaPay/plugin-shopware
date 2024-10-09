@@ -8,7 +8,6 @@ class Order {
         })
     }
 
-
     addProduct() {
         cy.get('.nav-item-a515ae260223466f8e37471d279e6406 > .main-navigation-link-text > span').click()
         cy.get(':nth-child(1) > .card > .card-body > .product-info > .product-action > .buy-widget > .d-grid > .btn').click()
@@ -24,7 +23,6 @@ class Order {
             cy.get('#cvcInput').type('123')
             cy.get('#cardholderNameInput').type('smith')
             cy.get('#pensioCreditCardPaymentSubmitButton').click().wait(3000)
-
         })
         cy.get('body').should('contain', 'Order confirmation email has been sent').wait(3000)
     }
@@ -36,7 +34,6 @@ class Order {
         cy.get('#radio_pay_later').click().wait(8000)
         cy.get('[id=submitbutton]').click().wait(5000)
         cy.wait(5000)
-
     }
 
     visitAdminOrder() {
@@ -51,21 +48,16 @@ class Order {
             cy.get('.sw-data-grid__row--0 > .sw-data-grid__cell--orderNumber > .sw-data-grid__cell-content > a').click()
             cy.get('.sw-order-detail__tabs-tab-altaPay').click()
         })
-
     }
 
     capture() {
         cy.get(':nth-child(2) > .sw-container > :nth-child(1)').click()
         cy.get('.sw-container > :nth-child(10)').should('have.text', '19.99 DKK');
-
-
-
     }
 
     refund() {
         cy.get(':nth-child(2) > .sw-container > :nth-child(2)').click()
         cy.get('.sw-container > :nth-child(12)').should('have.text', '19.99 DKK');
-
     }
 
     release() {

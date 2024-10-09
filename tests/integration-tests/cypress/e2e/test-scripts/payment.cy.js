@@ -17,7 +17,6 @@ it('CC Capture & Refund', function () {
                     ord.visitAdminOrder()
                     ord.capture()
                     ord.refund()
-
                 } else {
                     cy.log(conf.CC_TERMINAL_NAME + ' not found in page')
                     this.skip()
@@ -30,9 +29,7 @@ it('CC Capture & Refund', function () {
     })
 })
 
-
-it('CC Release', function () {
-    
+it('CC Release Payment', function () {
     const ord = new Order()
     ord.clrcookies()
     ord.visit()
@@ -56,11 +53,9 @@ it('CC Release', function () {
             this.skip()
         }
     })
-
 })
 
-
-it('Klarna Form Open', function () {
+it('Klarna Open Form', function () {
    
     const ord = new Order()
     ord.clrcookies()
@@ -73,8 +68,6 @@ it('Klarna Form Open', function () {
             cy.get('body').then(($a) => {
                 if ($a.find("label:contains('" + conf.KLARNA_DKK_TERMINAL_NAME + "')").length) {
                     ord.klarna(conf.KLARNA_DKK_TERMINAL_NAME)
-                    
-
                 } else {
                     cy.log(conf.KLARNA_DKK_TERMINAL_NAME + ' not found in page')
                     this.skip()
@@ -85,5 +78,4 @@ it('Klarna Form Open', function () {
             this.skip()
         }
     })
-
 })
