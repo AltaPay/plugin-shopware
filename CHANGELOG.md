@@ -3,7 +3,7 @@ All notable changes to this project will be documented in this file.
 
 ## [1.3.0]
 ### Added
--  Automatically capture payment on Order status `Done` and refund on Delivery status `Returned`.
+-  Automatically capture payment on Order status `Done` and refund/release on Delivery status `Returned`.
 ### Fixed
 - Fail callback crashing issue after introduction of auto capture functionality.
   
