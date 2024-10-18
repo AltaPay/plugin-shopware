@@ -87,37 +87,35 @@ class OrderStateChangeSubscriber implements EventSubscriberInterface
 
             $altaPayTransaction = $this->getAltaPayTransaction($order);
 
-            if ($altaPayTransaction) {
-                if ((float)$altaPayTransaction->CapturedAmount > 0.0 &&
-                    (float)$altaPayTransaction->RefundedAmount < (float)$altaPayTransaction->CapturedAmount) {
+            if ($altaPayTransaction && (float)$altaPayTransaction->CapturedAmount > 0.0 &&
+                (float)$altaPayTransaction->RefundedAmount < (float)$altaPayTransaction->CapturedAmount) {
 
-                    $response = $this->paymentService->refundCapturedReservation(
-                        $order->getCustomFields()[PaymentService::ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD],
-                        $order->getSalesChannelId()
+                $response = $this->paymentService->refundCapturedReservation(
+                    $order->getCustomFields()[PaymentService::ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD],
+                    $order->getSalesChannelId()
+                );
+                $responseAsXml = new SimpleXMLElement($response->getBody()->getContents());
+
+                if ((string)$responseAsXml->Body?->Result === "Success") {
+                    $this->orderTransactionStateHandler->refund(
+                        $order->getTransactions()->first()->getId(),
+                        $context
                     );
-                    $responseAsXml = new SimpleXMLElement($response->getBody()->getContents());
+                }
+            } elseif ((float)$altaPayTransaction->ReservedAmount > 0.0 &&
+                (float)$altaPayTransaction->CapturedAmount === 0.0) {
 
-                    if ((string)$responseAsXml->Body?->Result === "Success") {
-                        $this->orderTransactionStateHandler->refund(
-                            $order->getTransactions()->first()->getId(),
-                            $context
-                        );
-                    }
-                } elseif ((float)$altaPayTransaction->ReservedAmount > 0.0 &&
-                    (float)$altaPayTransaction->CapturedAmount === 0.0) {
+                $response = $this->paymentService->releaseReservation(
+                    $order->getCustomFields()[PaymentService::ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD],
+                    $order->getSalesChannelId()
+                );
+                $responseAsXml = new SimpleXMLElement($response->getBody()->getContents());
 
-                    $response = $this->paymentService->releaseReservation(
-                        $order->getCustomFields()[PaymentService::ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD],
-                        $order->getSalesChannelId()
+                if ((string)$responseAsXml->Body?->Result === "Success") {
+                    $this->orderTransactionStateHandler->cancel(
+                        $order->getTransactions()->first()->getId(),
+                        $context
                     );
-                    $responseAsXml = new SimpleXMLElement($response->getBody()->getContents());
-
-                    if ((string)$responseAsXml->Body?->Result === "Success") {
-                        $this->orderTransactionStateHandler->cancel(
-                            $order->getTransactions()->first()->getId(),
-                            $context
-                        );
-                    }
                 }
             }
         } catch (Exception $exception) {
