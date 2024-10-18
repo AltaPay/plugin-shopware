@@ -58,7 +58,7 @@ class OrderStateChangeSubscriber implements EventSubscriberInterface
                 }
             }
         } catch (Exception $exception) {
-            $this->logger->error($exception->getMessage());
+            $this->logger->error($exception->getMessage(), ['exception' => $exception]);
         }
     }
 
@@ -119,7 +119,7 @@ class OrderStateChangeSubscriber implements EventSubscriberInterface
                 }
             }
         } catch (Exception $exception) {
-            $this->logger->error($exception->getMessage());
+            $this->logger->error($exception->getMessage(), ['exception' => $exception]);
         }
     }
 
