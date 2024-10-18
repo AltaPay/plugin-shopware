@@ -120,10 +120,11 @@ class CallbackController extends StorefrontController
             ->router
             ->generate(
                 'payment.finalize.transaction',
-                [
-                    '_sw_payment_token' => $request->get('_sw_payment_token'),
-                    'xml' => $request->get('xml')
-                ],
+                array_merge(
+                    $request->query->all(),
+                    $request->request->all(),
+                    ['_sw_payment_token' => $request->get('_sw_payment_token'), 'xml' => $request->get('xml')]
+                ),
                 UrlGeneratorInterface::ABSOLUTE_URL
             );
 

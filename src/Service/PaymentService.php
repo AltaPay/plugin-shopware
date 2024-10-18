@@ -66,8 +66,7 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
         $order = $transaction->getOrder();
         $paymentMethod = $transaction->getOrderTransaction()->getPaymentMethod();
         $terminal = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_TERMINAL_ID_CUSTOM_FIELD];
-        $paymentRequestType = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_AUTO_CAPTURE_CUSTOM_FIELD] ? 'paymentAndCapture' : 'payment';
-
+        $paymentRequestType = ($paymentMethod->getTranslated()['customFields'][self::ALTAPAY_AUTO_CAPTURE_CUSTOM_FIELD] ?? null) ? 'paymentAndCapture' : 'payment';
         try {
             $altaPayResponse = $this->createPaymentRequest(
                 $order,
@@ -139,10 +138,13 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
                 break;
             case "Success":
                 // Delete cart when either customer or AltaPay reaches this page.
-                $this->cartPersister->delete(
-                    $order->getCustomFieldsValue(field: WexoAltaPay::ALTAPAY_CART_TOKEN),
-                    $salesChannelContext
-                );
+                $cartToken = $order->getCustomFieldsValue(field: WexoAltaPay::ALTAPAY_CART_TOKEN);
+                if (!empty($cartToken)) {
+                    $this->cartPersister->delete(
+                        $cartToken,
+                        $salesChannelContext
+                    );
+                }
 
                 if ($this->systemConfigService
                         ->getBool('WexoAltaPay.config.keepOrderOpen', $salesChannelContext->getSalesChannelId())
