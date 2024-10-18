@@ -1,7 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [1.2.9]
+## [1.3.0]
+### Added
+-  Automatically capture payment on Order status `Done` and refund on Delivery status `Returned`.
+### Fixed
+- Fail callback crashing issue after introduction of auto capture functionality.
+  
+##   [1.2.9]
 ### Added
 - Add `transaction_info` meta data as part of gateway payment request.
 
