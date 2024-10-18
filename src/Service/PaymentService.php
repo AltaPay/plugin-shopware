@@ -66,8 +66,7 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
         $order = $transaction->getOrder();
         $paymentMethod = $transaction->getOrderTransaction()->getPaymentMethod();
         $terminal = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_TERMINAL_ID_CUSTOM_FIELD];
-        $paymentRequestType = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_AUTO_CAPTURE_CUSTOM_FIELD] ? 'paymentAndCapture' : 'payment';
-
+        $paymentRequestType = ($paymentMethod->getTranslated()['customFields'][self::ALTAPAY_AUTO_CAPTURE_CUSTOM_FIELD] ?? null) ? 'paymentAndCapture' : 'payment';
         try {
             $altaPayResponse = $this->createPaymentRequest(
                 $order,
