@@ -139,10 +139,13 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
                 break;
             case "Success":
                 // Delete cart when either customer or AltaPay reaches this page.
-                $this->cartPersister->delete(
-                    $order->getCustomFieldsValue(field: WexoAltaPay::ALTAPAY_CART_TOKEN),
-                    $salesChannelContext
-                );
+                $cartToken = $order->getCustomFieldsValue(field: WexoAltaPay::ALTAPAY_CART_TOKEN);
+                if (!empty($cartToken)) {
+                    $this->cartPersister->delete(
+                        $cartToken,
+                        $salesChannelContext
+                    );
+                }
 
                 if ($this->systemConfigService
                         ->getBool('WexoAltaPay.config.keepOrderOpen', $salesChannelContext->getSalesChannelId())
