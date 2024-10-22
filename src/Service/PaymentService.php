@@ -449,11 +449,11 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
     /**
      * @see https://documentation.altapay.com/Content/Ecom/API/API%20Methods/captureReservation.htm
      */
-    public function captureReservation(OrderEntity $order, string $salesChannelId, string $transactionId = null): ResponseInterface
+    public function captureReservation(OrderEntity $order, string $salesChannelId, string $transactionId = null, $amount = null): ResponseInterface
     {
         return $this->getAltaPayClient($salesChannelId)->request('POST', 'captureReservation', [
             'form_params' => [
-                'amount' => $order->getAmountTotal(),
+                'amount' => $amount ?: $order->getAmountTotal(),
                 'transaction_id' => $order->getCustomFields()[self::ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD]?:$transactionId
             ]
         ]);

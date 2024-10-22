@@ -43,18 +43,26 @@ class OrderStateChangeSubscriber implements EventSubscriberInterface
 
             $altaPayTransaction = $this->getAltaPayTransaction($order);
 
-            if ($altaPayTransaction &&
-                (float)$altaPayTransaction->ReservedAmount > 0.0 &&
-                (float)$altaPayTransaction->CapturedAmount < (float)$altaPayTransaction->ReservedAmount) {
+            if ($altaPayTransaction && (float)$altaPayTransaction->ReservedAmount > 0.0) {
 
-                $response = $this->paymentService->captureReservation($order, $order->getSalesChannelId());
-                $responseAsXml = new SimpleXMLElement($response->getBody()->getContents());
+                $orderTotal = $order->getAmountTotal();
+                $capturedAmount = (float)$altaPayTransaction->CapturedAmount;
 
-                if ((string)$responseAsXml->Body?->Result === "Success") {
-                    $this->orderTransactionStateHandler->paid(
-                        $order->getTransactions()->first()->getId(),
-                        $context
-                    );
+                // Calculate the remaining amount that can be captured
+                $remainingAmount = $orderTotal - $capturedAmount;
+
+                // Ensure the remaining amount is not negative and less than or equal to the reserved amount
+                if ($remainingAmount > 0.0 && $remainingAmount <= (float)$altaPayTransaction->ReservedAmount) {
+
+                    $response = $this->paymentService->captureReservation($order, $order->getSalesChannelId(), $remainingAmount);
+                    $responseAsXml = new SimpleXMLElement($response->getBody()->getContents());
+
+                    if ((string)$responseAsXml->Body?->Result === "Success") {
+                        $this->orderTransactionStateHandler->paid(
+                            $order->getTransactions()->first()->getId(),
+                            $context
+                        );
+                    }
                 }
             }
         } catch (Exception $exception) {
