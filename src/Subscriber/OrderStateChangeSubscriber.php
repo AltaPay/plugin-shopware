@@ -62,7 +62,14 @@ class OrderStateChangeSubscriber implements EventSubscriberInterface
                             $order->getTransactions()->first()->getId(),
                             $context
                         );
+                    } else {
+                        $this->logger->error("Capture failed for Order ID: " . $order->getId());
                     }
+                } else {
+                    $this->logger->error(
+                        "Invalid remaining amount for capture. Order ID: {$order->getId()}, " .
+                        "Remaining Amount: {$remainingAmount}, Reserved Amount: {$altaPayTransaction->ReservedAmount}"
+                    );
                 }
             }
         } catch (Exception $exception) {
@@ -109,6 +116,8 @@ class OrderStateChangeSubscriber implements EventSubscriberInterface
                         $order->getTransactions()->first()->getId(),
                         $context
                     );
+                } else {
+                    $this->logger->error("Refund failed for Order ID: {$order->getId()}, due to the status: " . (string)$responseAsXml->Body?->Result);
                 }
             } elseif ((float)$altaPayTransaction->ReservedAmount > 0.0 &&
                 (float)$altaPayTransaction->CapturedAmount === 0.0) {
@@ -124,7 +133,16 @@ class OrderStateChangeSubscriber implements EventSubscriberInterface
                         $order->getTransactions()->first()->getId(),
                         $context
                     );
+                } else {
+                    $this->logger->error("Release reservation failed for Order ID: {$order->getId()}");
                 }
+            } else {
+                $this->logger->warning(
+                    "Transaction state not valid for refund or release. Order ID: {$order->getId()}, " .
+                    "Captured Amount: {$altaPayTransaction->CapturedAmount}, " .
+                    "Refunded Amount: {$altaPayTransaction->RefundedAmount}, " .
+                    "Reserved Amount: {$altaPayTransaction->ReservedAmount}"
+                );
             }
         } catch (Exception $exception) {
             $this->logger->error($exception->getMessage(), ['exception' => $exception]);
