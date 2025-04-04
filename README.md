@@ -1,6 +1,39 @@
 # AltaPay for Shopware
 Integrates your Shopware web shop to the AltaPay payments gateway.
 
+## Supported Payment Methods & Functionalities
+<table>
+<tr><td>
+
+| Functionalities	        | Support       |
+| :------------------------ | :-----------: |
+| Reservation               | &check;       |
+| Capture                   | &check;       |
+| Instant Capture           | &check;       |
+| Multi Capture             | &cross;       |
+| Recurring / Unscheduled   | &cross;       |
+| Release                   | &check;       |
+| Refund                    | &check;       |
+| Multi Refund              | &cross;       |
+| 3D Secure                 | &check;       |
+| Fraud prevention (other)  | &check;       |
+| Reconciliation            | &check;       |
+| MO/TO                     | &cross;       |
+
+</td><td valign="top">
+ 
+| Payment Methods	  | Support       |
+| ------------------- | :-----------: |
+| Card                | &check;       |
+| Invoice             | &check;       |
+| ePayments           | &check;       |
+| Bank-to-bank        | &check;       |
+| Interbank           | &check;       |
+| Cash Wallet         | &check;       |
+| Mobile Wallet       | &check;       |
+
+</td></tr> </table>
+
 ## Compatibility
 - Shopware 6.5.8.x
 (Tested version 6.5.8.10)
