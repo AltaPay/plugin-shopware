@@ -33,6 +33,8 @@ be provided by AltaPay.
     -   Terminal
     -   Shop Name
 
+> **Note:** If the API user credentials have not yet been created, refer to the [Creating a New API User](#creating-a-new-api-user) section for step-by-step instructions.
+
 ## Installation
 
 1. Download the latest release (**altapay-master.zip**) file from the [Releases](https://github.com/AltaPay/plugin-shopware/releases) tab
@@ -99,6 +101,26 @@ be provided by AltaPay.
 
     ![shopware_checkout_page.png](Docs/Configuration/shopware_checkout_page.png)
 
+## Creating a New API User
+
+To create a new API user in your AltaPay account, please follow these steps:
+
+- Log in to your AltaPay account.
+- From the left menu, navigate to **Settings** > **API Keys**.
+
+    ![api_key](Docs/API/api_keys.png)
+    
+- Click on the **Create New API Key** button from top right corner.
+- Fill in the required fields:
+    - **Your current password**  
+    - **Username**  
+    - **Password**  
+    - **Assign Shops**
+    
+    ![create_api_key](Docs/API/create_api_key.png)
+- After entering the details, click **Create**.
+
+The new credentials can now be used as the API Username and API Password in the Gateway Account Configuration section.
 
 ## Supported versions
 - Shopware 6.5.x
