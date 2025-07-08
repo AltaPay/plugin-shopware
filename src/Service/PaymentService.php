@@ -146,10 +146,12 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
                     );
                 }
 
-                if ($this->systemConfigService
-                        ->getBool('WexoAltaPay.config.keepOrderOpen', $salesChannelContext->getSalesChannelId())
-                    ||
-                    $transaction->getStateMachineState()->getTechnicalName() !== OrderTransactionStates::STATE_OPEN) {
+                $stateMachineState = $transaction->getStateMachineState();
+                if (
+                    $this->systemConfigService->getBool('WexoAltaPay.config.keepOrderOpen', $salesChannelContext->getSalesChannelId())
+                    || !$stateMachineState
+                    || $stateMachineState->getTechnicalName() !== OrderTransactionStates::STATE_OPEN
+                ) {
                     break;
                 }
                 $this->orderTransactionStateHandler->process(

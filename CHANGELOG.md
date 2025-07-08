@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.3.1]
+### Added
+Add compatibility for Shopware 6.6.
+
 ## [1.3.0]
 ### Added
 -  Automatically capture payment on Order status `Done` and refund/release on Delivery status `Returned`.
