@@ -36,7 +36,7 @@ Integrates your Shopware web shop to the AltaPay payments gateway.
 
 ## Compatibility
 - Shopware 6.5.8.x
-(Tested version 6.5.8.10)
+(Tested version 6.5.8.13)
 
 ## Changelog
 See [Changelog](CHANGELOG.md) for all the release notes.
