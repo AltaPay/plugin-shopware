@@ -14,7 +14,7 @@ use Shopware\Core\Checkout\Order\Aggregate\OrderTransaction\OrderTransactionStat
 use Shopware\Core\Checkout\Order\OrderEntity;
 use Shopware\Core\Checkout\Payment\Cart\AsyncPaymentTransactionStruct;
 use Shopware\Core\Checkout\Payment\Cart\PaymentHandler\AsynchronousPaymentHandlerInterface;
-use Shopware\Core\Checkout\Payment\Exception\AsyncPaymentFinalizeException;
+use Shopware\Core\Checkout\Payment\PaymentException;
 use Shopware\Core\Checkout\Payment\Exception\AsyncPaymentProcessException;
 use Shopware\Core\Checkout\Payment\Exception\CustomerCanceledAsyncPaymentException;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
@@ -182,7 +182,7 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
 
                 break;
             case "Cancel":
-                throw new CustomerCanceledAsyncPaymentException(
+                throw PaymentException::customerCanceled(
                     $transaction->getId(),
                     "Transaction was cancelled in AltaPay"
                 );
@@ -191,7 +191,7 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
             case "Error":
             case "Fail":
             default:
-                throw new AsyncPaymentFinalizeException(
+                throw PaymentException::asyncProcessInterrupted(
                     $transaction->getId(),
                     (string)$result->Body?->MerchantErrorMessage
                     ?? (string)$result->APIResponse?->Header?->ErrorMessage
@@ -269,14 +269,13 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
         foreach ($order->getLineItems() as $lineItem) {
             $unitTaxRate = $lineItem->getPrice()?->getCalculatedTaxes()->getAmount() / $lineItem->getQuantity();
 
-            $unitPrice = round(($lineItem->getPrice()?->getUnitPrice() ?? 0.0) - ($unitTaxRate ?? 0.0), 3);
-            $taxAmount = $lineItem->getPrice()?->getCalculatedTaxes()->getAmount() ?? 0.0;
-
-            $discount = $lineItem->getPrice()?->getListPrice()?->getDiscount() ?? 0.0;
-
-            if ($discount != 0.0) {
-                $discount = ($taxAmount + $unitPrice) * (abs($discount) / 100);
+            $unitPrice = round(($lineItem->getPrice()?->getUnitPrice() ?? 0.0) - ($unitTaxRate ?? 0.0), 2);
+            
+            if (empty($unitPrice)) {
+                continue;
             }
+
+            $taxAmount = $lineItem->getPrice()?->getCalculatedTaxes()->getAmount() ?? 0.0;
 
             $orderLines[] = match ($lineItem->getType()) {
                 LineItem::PRODUCT_LINE_ITEM_TYPE,
@@ -290,7 +289,7 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
                     'quantity' => $lineItem->getQuantity(),
                     'unitPrice' => $unitPrice,
                     'taxAmount' => $taxAmount,
-                    'discount' => $discount,
+                    'discount' => 0,
                     'goodsType' => match ($lineItem->getType()) {
                         LineItem::PRODUCT_LINE_ITEM_TYPE,
                         LineItem::CONTAINER_LINE_ITEM,
@@ -305,7 +304,7 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
         }
         foreach ($order->getDeliveries() as $delivery) {
             $netUnitPrice = round($delivery->getShippingCosts()->getUnitPrice()
-                - $delivery->getShippingCosts()->getCalculatedTaxes()->getAmount(), 3);
+                - $delivery->getShippingCosts()->getCalculatedTaxes()->getAmount(), 2);
 
             $taxAmount = $delivery->getShippingCosts()->getCalculatedTaxes()->getAmount();
 
@@ -321,7 +320,7 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
                 'quantity' => 1,
                 'unitPrice' => $netUnitPrice,
                 'taxAmount' => $taxAmount,
-                'discount' => $discount,
+                'discount' => 0,
                 'goodsType' => 'shipment'
             ];
         }
