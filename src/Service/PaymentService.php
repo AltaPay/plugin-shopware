@@ -242,7 +242,7 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
             'quantity' => $lineItem->getQuantity(),
             'unitPrice' => $lineItem->getPrice()?->getUnitPrice() ?? 0.0,
             'taxAmount' => $lineItem->getPrice()?->getCalculatedTaxes()->getAmount() ?? 0.0,
-            'discount' => $lineItem->getPrice()->getListPrice()?->getDiscount() ?? 0.0,
+            'discount' => 0,
             'goodsType' => match ($lineItem->getType()) {
                 LineItem::PRODUCT_LINE_ITEM_TYPE,
                 LineItem::CONTAINER_LINE_ITEM,
