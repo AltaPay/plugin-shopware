@@ -21,7 +21,7 @@ class WexoAltaPay extends Plugin
     public const ALTAPAY_FIELD_SET_NAME = "wexoAltaPay";
     public const ALTAPAY_PAYMENT_METHOD_FIELD_SET_NAME = "wexoAltaPayPaymentMethod";
     public const ALTAPAY_CART_TOKEN = "wexoAltaPayCartToken";
-    public const ALTAPAY_PLUGIN_VERSION = '1.3.1';
+    public const ALTAPAY_PLUGIN_VERSION = '1.3.2';
     public const ALTAPAY_PLUGIN_NAME = 'WexoAltaPay';
 
     public function update(UpdateContext $updateContext): void
