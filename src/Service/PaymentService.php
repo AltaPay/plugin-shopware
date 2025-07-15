@@ -306,13 +306,11 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
             $netUnitPrice = round($delivery->getShippingCosts()->getUnitPrice()
                 - $delivery->getShippingCosts()->getCalculatedTaxes()->getAmount(), 2);
 
-            $taxAmount = $delivery->getShippingCosts()->getCalculatedTaxes()->getAmount();
-
-            $discount = $delivery->getShippingCosts()->getListPrice()?->getDiscount() ?? 0.0;
-
-            if ($discount != 0.0) {
-                $discount = ($taxAmount + $netUnitPrice) * (abs($discount) / 100);
+            if (empty($netUnitPrice)) {
+                continue;
             }
+
+            $taxAmount = $delivery->getShippingCosts()->getCalculatedTaxes()->getAmount();
 
             $orderLines[] = [
                 'description' => $delivery->getShippingMethod()?->getDescription() ?? 'Shipping',
