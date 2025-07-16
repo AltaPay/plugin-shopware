@@ -1,9 +1,16 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.3.2]
+### Added
+- Simplify order line calculations to support the new PayPal integration.
+### Fixed
+- Fix: Order line price mismatch caused by incorrect discount amount.
+- Handle exception when the order payment fails.
+
 ## [1.3.1]
 ### Added
-Add compatibility for Shopware 6.6.
+- Add compatibility for Shopware 6.6.x
 
 ## [1.3.0]
 ### Added
