@@ -1,6 +1,6 @@
 import template from './sw-order-detail-altapay.html.twig';
 
-const { mapGetters, mapState } = Shopware.Component.getComponentHelper();
+const { mapVuexGetters, mapVuexState } = Shopware.Component.getComponentHelper();
 const { State } = Shopware;
 
 Shopware.Component.register('sw-order-detail-altapay', {
@@ -9,14 +9,12 @@ Shopware.Component.register('sw-order-detail-altapay', {
     inject: ['altaPayService'],
 
     computed: {
-        ...mapGetters('swOrderDetail', [
+        ...mapVuexGetters('swOrderDetail', [
             'isLoading',
         ]),
-        ...mapState('swOrderDetail', [
-            'order',
-            'versionContext',
-            'orderAddressIds',
-        ]),
+        order() {
+            return Shopware.Store.get('swOrderDetail').order;
+        }
     },
 
     metaInfo() {

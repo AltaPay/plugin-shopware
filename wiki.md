@@ -123,10 +123,10 @@ To create a new API user in your AltaPay account, please follow these steps:
 The new credentials can now be used as the API Username and API Password in the Gateway Account Configuration section.
 
 ## Supported versions
-- Shopware 6.5.x
 - Shopware 6.6.x
+- Shopware 6.7.x
 
-The latest tested versions are `6.5.8.13` and `6.6.10.5`
+The latest tested versions are `6.6.10.5` and `6.7.0.1`
 
 ## Troubleshooting
 

@@ -1,0 +1,23 @@
+{
+  "base": "/bundles/wexoaltapay/administration/",
+  "entryPoints": {
+    "wexo-alta-pay": {
+      "css": [],
+      "dynamic": [],
+      "js": [
+        "/bundles/wexoaltapay/administration/assets/wexo-alta-pay-OB99cCGp.js"
+      ],
+      "legacy": false,
+      "preload": []
+    }
+  },
+  "legacy": false,
+  "metadatas": {},
+  "version": [
+    "7.1.0",
+    7,
+    1,
+    0
+  ],
+  "viteServer": null
+}
