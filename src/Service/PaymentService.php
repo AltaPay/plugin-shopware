@@ -521,7 +521,7 @@ class PaymentService extends AbstractPaymentHandler
                     'billing_city' => $billingAddress->getCity(),
                     'billing_region' => $billingAddress->getCountryState()?->getName() ?? '',
                     'billing_postal' => $billingAddress->getZipcode(),
-                    'billing_country' => $billingAddress->getCountry()?->getIso(),
+                    'billing_country' => $billingAddress->getCountry()?->getIso() ?? $context->getCustomer()?->getActiveBillingAddress()?->getCountry()?->getIso(),
                 ],
                 'transaction_info' => [
                     'ecomPlatform' => 'Shopware',
