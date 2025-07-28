@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [2.0.0]
+### Added
+- Add compatibility for Shopware 6.7.x
+
 ## [1.3.2]
 ### Added
 - Simplify order line calculations to support the new PayPal integration.

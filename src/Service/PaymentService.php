@@ -12,15 +12,10 @@ use Shopware\Core\Checkout\Order\Aggregate\OrderTransaction\OrderTransactionEnti
 use Shopware\Core\Checkout\Order\Aggregate\OrderTransaction\OrderTransactionStateHandler;
 use Shopware\Core\Checkout\Order\Aggregate\OrderTransaction\OrderTransactionStates;
 use Shopware\Core\Checkout\Order\OrderEntity;
-use Shopware\Core\Checkout\Payment\Cart\AsyncPaymentTransactionStruct;
-use Shopware\Core\Checkout\Payment\Cart\PaymentHandler\AsynchronousPaymentHandlerInterface;
 use Shopware\Core\Checkout\Payment\PaymentException;
-use Shopware\Core\Checkout\Payment\Exception\AsyncPaymentProcessException;
-use Shopware\Core\Checkout\Payment\Exception\CustomerCanceledAsyncPaymentException;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
-use Shopware\Core\Framework\Validation\DataBag\RequestDataBag;
 use Shopware\Core\System\Language\LanguageEntity;
 use Shopware\Core\System\SalesChannel\SalesChannelContext;
 use Shopware\Core\System\SystemConfig\SystemConfigService;
@@ -31,12 +26,23 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Routing\RouterInterface;
 use Wexo\AltaPay\WexoAltaPay;
+use Shopware\Core\Checkout\Payment\Cart\PaymentHandler\AbstractPaymentHandler;
+use Shopware\Core\Checkout\Payment\Cart\PaymentHandler\PaymentHandlerType;
+use Shopware\Core\Checkout\Payment\Cart\PaymentTransactionStruct;
+use Shopware\Core\Framework\Context;
+use Shopware\Core\Framework\Struct\Struct;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Shopware\Core\PlatformRequest;
+use Shopware\Core\System\SalesChannel\Context\AbstractSalesChannelContextFactory;
+use Shopware\Core\System\SalesChannel\Context\SalesChannelContextFactory;
+use Shopware\Core\System\SalesChannel\Context\SalesChannelContextService;
+use Shopware\Core\Checkout\Cart\Order\OrderConverter;
 
 /**
  * Represents the Payment Method in Shopware,
  * and contains functions for communicating with AltaPay via API.
  */
-class PaymentService implements AsynchronousPaymentHandlerInterface
+class PaymentService extends AbstractPaymentHandler
 {
     public const ALTAPAY_PAYMENT_ID_CUSTOM_FIELD = "wexoAltaPayPaymentId";
     public const ALTAPAY_TERMINAL_ID_CUSTOM_FIELD = "wexoAltaPayTerminalId";
@@ -54,17 +60,92 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
         protected readonly RouterInterface $router,
         protected readonly EntityRepository $languageRepository,
         protected readonly AbstractCartPersister $cartPersister,
-        protected readonly ContainerInterface $container
+        protected readonly ContainerInterface $container,
+        protected readonly EntityRepository $orderTransactionRepository,
+        protected readonly RequestStack $requestStack,
+        protected readonly AbstractSalesChannelContextFactory $salesChannelContextFactory
     ) {
     }
 
+    public function supports(PaymentHandlerType $type, string $paymentMethodId, Context $context): bool
+    {
+        return false;
+    }
+
+    /**
+     * Load OrderTransaction and Order with related data.
+     *
+     * @param PaymentTransactionStruct $transaction
+     * @param Context $context
+     *
+     * @return array{OrderTransactionEntity, OrderEntity, string|null, string|null}
+     */
+    private function loadOrderTransactionAndOrder(PaymentTransactionStruct $transaction, Context $context): array
+    {
+        $orderTransactionId = $transaction->getOrderTransactionId();
+
+        $orderTransaction = $this->orderTransactionRepository
+            ->search(new Criteria([$orderTransactionId]), $context)
+            ->get($orderTransactionId);
+
+        if (!$orderTransaction) {
+            throw new \RuntimeException("OrderTransaction not found.");
+        }
+
+        $orderId = $orderTransaction->getOrderId();
+
+        $criteria = new Criteria([$orderId]);
+        $criteria->addAssociation('currency');
+        $criteria->addAssociation('language');
+        $criteria->addAssociation('salesChannel');
+        $criteria->addAssociation('customer');
+        $criteria->addAssociation('lineItems');
+        $criteria->addAssociation('deliveries');
+        $criteria->addAssociation('billingAddress');
+        $criteria->addAssociation('addresses');
+
+        $order = $this->orderRepository->search($criteria, $context)->first();
+
+        if (!$order) {
+            throw new \RuntimeException("Order not found.");
+        }
+
+        $billingAddress = $order->getBillingAddress();
+        $countryStateId = $billingAddress?->getCountryStateId();
+
+        $customer = $order->getOrderCustomer()?->getCustomer();
+        $customerGroupId = $customer?->getGroupId();
+
+        return [$orderTransaction, $order, $countryStateId, $customerGroupId];
+    }
+
+
     public function pay(
-        AsyncPaymentTransactionStruct $transaction,
-        RequestDataBag $dataBag,
-        SalesChannelContext $salesChannelContext
-    ): RedirectResponse {
-        $order = $transaction->getOrder();
-        $paymentMethod = $transaction->getOrderTransaction()->getPaymentMethod();
+        Request $request,
+        PaymentTransactionStruct $transaction,
+        Context $context,
+        ?Struct $validateStruct): ?RedirectResponse {
+        $orderTransactionId = $transaction->getOrderTransactionId();
+        [$orderTransaction, $order, $countryStateId, $customerGroupId]
+            = $this->loadOrderTransactionAndOrder($transaction, $context);
+        $currentRequest = $this->requestStack->getCurrentRequest();
+        $contextToken   = $currentRequest->headers->get(PlatformRequest::HEADER_CONTEXT_TOKEN);
+
+        $salesChannelContext = $this->salesChannelContextFactory->create(
+            $contextToken,
+            $order->getSalesChannelId(),
+            [
+                SalesChannelContextService::CURRENCY_ID => $order->getCurrencyId(),
+                SalesChannelContextService::LANGUAGE_ID => $order->getLanguageId(),
+                SalesChannelContextService::CUSTOMER_ID => $order->getOrderCustomer()->getCustomerId(),
+                SalesChannelContextService::COUNTRY_STATE_ID => $countryStateId,
+                SalesChannelContextService::CUSTOMER_GROUP_ID => $customerGroupId,
+                SalesChannelContextService::PERMISSIONS => OrderConverter::ADMIN_EDIT_ORDER_PERMISSIONS,
+                SalesChannelContextService::VERSION_ID => $context->getVersionId(),
+            ]
+        );
+
+        $paymentMethod = $salesChannelContext->getPaymentMethod();
         $terminal = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_TERMINAL_ID_CUSTOM_FIELD];
         $paymentRequestType = ($paymentMethod->getTranslated()['customFields'][self::ALTAPAY_AUTO_CAPTURE_CUSTOM_FIELD] ?? null) ? 'paymentAndCapture' : 'payment';
         try {
@@ -76,16 +157,15 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
                 $paymentRequestType
             );
         } catch (GuzzleException $e) {
-            throw new AsyncPaymentProcessException(
-                $transaction->getOrderTransaction()->getId(),
-                "Request error when creating payment request @ AltaPay",
-                $e
+            throw PaymentException::asyncProcessInterrupted(
+                $orderTransactionId,
+                'Request error when creating payment request @ AltaPay' . PHP_EOL . $e->getMessage()
             );
         }
         if (!$altaPayResponse->Body?->Result) {
-            throw new AsyncPaymentProcessException(
-                $transaction->getOrderTransaction()->getId(),
-                (string)$altaPayResponse->Header->ErrorMessage,
+            throw PaymentException::asyncProcessInterrupted(
+                $orderTransactionId,
+                'An error occurred',
             );
         }
         return new RedirectResponse((string)$altaPayResponse->Body->Url, 302, [
@@ -94,16 +174,36 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
         ]);
     }
 
+    /**
+     * This method will be called after redirect from the external payment provider.
+     */
     public function finalize(
-        AsyncPaymentTransactionStruct $transaction,
         Request $request,
-        SalesChannelContext $salesChannelContext
+        PaymentTransactionStruct $transaction,
+        Context $context
     ): void {
+        [$orderTransaction, $order, $countryStateId, $customerGroupId] =
+            $this->loadOrderTransactionAndOrder($transaction, $context);
+
+        $salesChannelContext = $this->salesChannelContextFactory->create(
+            $order->getDeepLinkCode() ?? $orderTransaction->getOrderId(),
+            $order->getSalesChannelId(),
+            [
+                SalesChannelContextService::CURRENCY_ID => $order->getCurrencyId(),
+                SalesChannelContextService::LANGUAGE_ID => $order->getLanguageId(),
+                SalesChannelContextService::CUSTOMER_ID => $order->getOrderCustomer()->getCustomerId(),
+                SalesChannelContextService::COUNTRY_STATE_ID => $countryStateId,
+                SalesChannelContextService::CUSTOMER_GROUP_ID => $customerGroupId,
+                SalesChannelContextService::PERMISSIONS => OrderConverter::ADMIN_EDIT_ORDER_PERMISSIONS,
+                SalesChannelContextService::VERSION_ID => $context->getVersionId(),
+            ]
+        );
+
         $allRequestParams = array_merge($request->query->all(), $request->request->all());
         $this->transactionCallback(
             new SimpleXMLElement($request->get('xml')),
-            $transaction->getOrder(),
-            $transaction->getOrderTransaction(),
+            $order,
+            $orderTransaction,
             $salesChannelContext,
             $allRequestParams
         );
@@ -370,7 +470,7 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
         );
 
         $billingAddress = $order->getBillingAddress();
-        $shippingAddress = $order->getDeliveries()->getShippingAddress()->first();
+        $shippingAddress = $order->getAddresses()->first();
 
         if ($order->getLanguage()) {
             $criteria = new Criteria();
@@ -410,18 +510,18 @@ class PaymentService implements AsynchronousPaymentHandlerInterface
                     'shipping_address' => $shippingAddress->getStreet(),
                     'shipping_postal' => $shippingAddress->getZipcode(),
                     'shipping_region' => $shippingAddress->getCountryState()?->getName() ?? '',
-                    'shipping_country' => $shippingAddress->getCountry()->getIso(),
+                    'shipping_country' => $context->getShippingLocation()?->getCountry()?->getIso(),
                     'shipping_city' => $shippingAddress->getCity(),
                     'email' => $customer->getEmail(),
                     'customer_phone' => $billingAddress->getPhoneNumber() ?? '',
-                    'birthdate' => $customer->getCustomer()->getBirthday()?->format('Y-m-d') ?? '',
+                    'birthdate' => $customer->getCustomer()?->getBirthday()?->format('Y-m-d') ?? '',
                     'billing_lastname' => $billingAddress->getLastName(),
                     'billing_firstname' => $billingAddress->getFirstName(),
                     'billing_address' => $billingAddress->getStreet(),
                     'billing_city' => $billingAddress->getCity(),
                     'billing_region' => $billingAddress->getCountryState()?->getName() ?? '',
                     'billing_postal' => $billingAddress->getZipcode(),
-                    'billing_country' => $billingAddress->getCountry()->getIso(),
+                    'billing_country' => $billingAddress->getCountry()?->getIso() ?? $context->getCustomer()?->getActiveBillingAddress()?->getCountry()?->getIso(),
                 ],
                 'transaction_info' => [
                     'ecomPlatform' => 'Shopware',

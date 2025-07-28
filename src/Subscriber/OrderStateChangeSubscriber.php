@@ -87,19 +87,6 @@ class OrderStateChangeSubscriber implements EventSubscriberInterface
                 return;
             }
 
-            $returnedDelivery = null;
-
-            foreach ($order->getDeliveries() as $delivery) {
-                if ($delivery->getStateMachineState()?->getTechnicalName() === 'returned') {
-                    $returnedDelivery = $delivery;
-                    break;
-                }
-            }
-
-            if (!$returnedDelivery) {
-                return;
-            }
-
             $altaPayTransaction = $this->getAltaPayTransaction($order);
 
             if ($altaPayTransaction && (float)$altaPayTransaction->CapturedAmount > 0.0 &&
