@@ -11,11 +11,12 @@ class AltaPayService extends ApiService {
         ).then(response => ApiService.handleResponse(response));
     };
 
-    capture(orderId) {
+    capture(orderId, captureAmount) {
         return this.httpClient.post(
             `/${this.getApiBasePath()}/capture`,
             {
-                orderId
+                orderId,
+                captureAmount
             },
             {
                 headers: this.getBasicHeaders()

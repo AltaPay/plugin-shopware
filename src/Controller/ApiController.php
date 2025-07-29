@@ -43,6 +43,7 @@ class ApiController extends AbstractController
     public function capture(Request $request): JsonApiResponse|Response
     {
         $orderId = $request->get('orderId');
+        $captureAmount = $request->get('captureAmount');
         $context = Context::createDefaultContext();
         $criteria = new Criteria([$orderId]);
         $criteria->addAssociation('transactions')
@@ -52,13 +53,23 @@ class ApiController extends AbstractController
             return new Response(status: 400);
         }
         /** @var $order OrderEntity */
-        $response = $this->paymentService->captureReservation($order, $order->getSalesChannelId());
+        $response = $this->paymentService->captureReservation($order, $order->getSalesChannelId(), null, $captureAmount);
         $responseAsXml = new \SimpleXMLElement($response->getBody()->getContents());
         if ((string)$responseAsXml->Body?->Result === "Success") {
-            $this->orderTransactionStateHandler->paid(
-                $order->getTransactions()->first()->getId(), // todo get right transaction
-                $context
-            );
+            $reservedAmount = (float)$responseAsXml->Body->Transactions->Transaction->ReservedAmount;
+            $capturedAmount = (float)$responseAsXml->Body->Transactions->Transaction->CapturedAmount;
+
+            if ($reservedAmount === $capturedAmount) {
+                $this->orderTransactionStateHandler->paid(
+                    $order->getTransactions()->first()->getId(), // todo get right transaction
+                    $context
+                );
+            } else {
+                $this->orderTransactionStateHandler->payPartially(
+                    $order->getTransactions()->first()->getId(), // todo get right transaction
+                    $context
+                );
+            }
         }
         return new JsonApiResponse(json_encode($responseAsXml));
     }
