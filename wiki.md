@@ -126,7 +126,7 @@ The new credentials can now be used as the API Username and API Password in the 
 - Shopware 6.6.x
 - Shopware 6.7.x
 
-The latest tested versions are `6.6.10.5` and `6.7.0.1`
+The latest tested versions are `6.6.10.5` and `6.7.1.0`
 
 ## Troubleshooting
 

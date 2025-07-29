@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [2.0.1]
+### Added
+- Add support for multi/partial capture.
+
 ## [2.0.0]
 ### Added
 - Add compatibility for Shopware 6.7.x
