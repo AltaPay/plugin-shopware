@@ -57,6 +57,8 @@ be provided by AltaPay.
 
    ![shopware_setup_altapay_credentials](Docs/Configuration/shopware_setup_altapay_credentials.png)
 
+    > **Note:** The **AltaPay ShopName** should match the subdomain at the beginning of your AltaPay URL. For example, if your payment URL is `https://demoshop.altapaysecure.com`, then the AltaPay ShopName is `demoshop`.
+
 3. Enable **Keep order in open state** setting if you don't want to change the order state to `Processing` when customer has completed the payment flow.
 
    ![shopware_altapay_extension_configure_keep_order_open](Docs/Configuration/shopware_altapay_extension_configure_keep_order_open.png)

@@ -30,6 +30,10 @@
             <name>shopName</name>
             <required>true</required>
             <label>AltaPay ShopName</label>
+            <helpText>
+                Enter the shop name that appears at the beginning of your AltaPay URL.
+                For example: demoshop (from https://demoshop.altapaysecure.com)
+            </helpText>
         </input-field>
         <input-field>
             <name>username</name>
