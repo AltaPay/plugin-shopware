@@ -61,12 +61,12 @@ class ApiController extends AbstractController
 
             if ($reservedAmount === $capturedAmount) {
                 $this->orderTransactionStateHandler->paid(
-                    $order->getTransactions()->first()->getId(), // todo get right transaction
+                    $order->getTransactions()->first()->getId(),
                     $context
                 );
             } else {
                 $this->orderTransactionStateHandler->payPartially(
-                    $order->getTransactions()->first()->getId(), // todo get right transaction
+                    $order->getTransactions()->first()->getId(),
                     $context
                 );
             }
