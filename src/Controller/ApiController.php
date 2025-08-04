@@ -52,6 +52,23 @@ class ApiController extends AbstractController
         if (!$order) {
             return new Response(status: 400);
         }
+
+        $transactionResponse      = $this->paymentService->getTransaction($order, $order->getSalesChannelId());
+        $transactionResponseAsXml = new \SimpleXMLElement($transactionResponse->getBody()->getContents());
+        $altaPayTransaction       = $transactionResponseAsXml->Body?->Transactions?->Transaction;
+
+        if (!$altaPayTransaction) {
+          return new Response(status: 400);
+        }
+
+        $orderTotal     = $order->getAmountTotal();
+        $capturedAmount = (float)$altaPayTransaction->CapturedAmount;
+
+        $remainingAmount = $orderTotal - $capturedAmount;
+        if ($captureAmount > $remainingAmount) {
+          return new Response(status: 400);
+        }
+
         /** @var $order OrderEntity */
         $response = $this->paymentService->captureReservation($order, $order->getSalesChannelId(), null, $captureAmount);
         $responseAsXml = new \SimpleXMLElement($response->getBody()->getContents());
@@ -59,7 +76,7 @@ class ApiController extends AbstractController
             $reservedAmount = (float)$responseAsXml->Body->Transactions->Transaction->ReservedAmount;
             $capturedAmount = (float)$responseAsXml->Body->Transactions->Transaction->CapturedAmount;
 
-            if ($reservedAmount === $capturedAmount) {
+            if ($capturedAmount === $reservedAmount || $capturedAmount === $orderTotal) {
                 $this->orderTransactionStateHandler->paid(
                     $order->getTransactions()->first()->getId(),
                     $context
