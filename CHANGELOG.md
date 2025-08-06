@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [2.0.2]
+### Added
+- Add support for multi/partial refund.
+
 ## [2.0.1]
 ### Added
 - Add support for multi/partial capture.

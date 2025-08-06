@@ -94,6 +94,7 @@ class ApiController extends AbstractController
     public function refund(Request $request): JsonApiResponse|Response
     {
         $orderId = $request->get('orderId');
+        $refundAmount = $request->get('refundAmount');
         $context = Context::createDefaultContext();
         $criteria = new Criteria([$orderId]);
         $criteria->addAssociation('transactions')
@@ -102,17 +103,44 @@ class ApiController extends AbstractController
         if (!$order) {
             return new Response(status: 400);
         }
+
+        $transactionResponse      = $this->paymentService->getTransaction($order, $order->getSalesChannelId());
+        $transactionResponseAsXml = new \SimpleXMLElement($transactionResponse->getBody()->getContents());
+        $altaPayTransaction       = $transactionResponseAsXml->Body?->Transactions?->Transaction;
+
+        if (!$altaPayTransaction) {
+          return new Response(status: 400);
+        }
+
+        $orderTotal     = (float)$order->getAmountTotal();
+        $refundedAmount = (float)$altaPayTransaction->RefundedAmount;
+        $capturedAmount = (float)$altaPayTransaction->CapturedAmount;
+
+        $remainingAmount = $refundedAmount - $capturedAmount;
+        if ($remainingAmount == 0) {
+          return new Response(status: 400);
+        }
+
         /** @var $order OrderEntity */
         $response = $this->paymentService->refundCapturedReservation(
             $order->getCustomFields()[PaymentService::ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD],
-            $order->getSalesChannelId()
+            $order->getSalesChannelId(),
+            $refundAmount
         );
         $responseAsXml = new \SimpleXMLElement($response->getBody()->getContents());
         if ((string)$responseAsXml->Body?->Result === "Success") {
+          $refundedAmount = (float)$responseAsXml->Body->Transactions->Transaction->RefundedAmount;
+          if($refundedAmount == $capturedAmount){
             $this->orderTransactionStateHandler->refund(
-                $order->getTransactions()->first()->getId(), // todo get right transaction
+                $order->getTransactions()->first()->getId(),
                 $context
             );
+          }else{
+            $this->orderTransactionStateHandler->refundPartially(
+                $order->getTransactions()->first()->getId(),
+                $context
+            );
+          }
         }
         return new JsonApiResponse(json_encode($responseAsXml));
     }
