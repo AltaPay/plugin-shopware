@@ -60,42 +60,42 @@ Shopware.Component.register('sw-order-detail-altapay', {
             });
         },
         capture() {
-          this.isLoadingCapture = true;
-          State.commit('swOrderDetail/setLoading', ['order', true]);
-          this.altaPayService.capture(this.orderId, this.captureAmount).then(response => {
-              if (response.Body.Result === 'Error') {
-                  this.errorMessage = response.Body.MerchantErrorMessage;
-                  return;
-              } else {
-                  this.successMessage = 'Captured successfully.';
-              }
-              this.transaction = response.Body.Transactions.Transaction;
-              this.$emit('save-edits');
-          }).finally(() => {
-              setTimeout(() => {
-                this.isLoadingCapture = false;
-                this.closeCaptureModal();
-                State.commit('swOrderDetail/setLoading', ['order', false]);
-              }, 2000);
-          });
-        },
-        refund() {
-          this.isLoadingRefund = true;
-          State.commit('swOrderDetail/setLoading', ['order', true]);
-          this.altaPayService.refund(this.orderId, this.refundAmount).then(response => {
-              if (response.Body.Result === 'Error') {
-                  this.errorMessage = response.Body.MerchantErrorMessage;
-                  return;
-              } else {
-                  this.successMessage = 'Refunded successfully.';
-              }
-              this.transaction = response.Body.Transactions.Transaction;
-              this.$emit('save-edits');
+            this.isLoadingCapture = true;
+            State.commit('swOrderDetail/setLoading', ['order', true]);
+            this.altaPayService.capture(this.orderId, this.captureAmount).then(response => {
+                if (response.Body.Result === 'Error') {
+                    this.errorMessage = response.Body.MerchantErrorMessage;
+                    return;
+                } else {
+                    this.successMessage = 'Captured successfully.';
+                }
+                this.transaction = response.Body.Transactions.Transaction;
+                this.$emit('save-edits');
             }).finally(() => {
                 setTimeout(() => {
-                  this.isLoadingRefund = false;
-                  this.closeRefundModal();
-                  State.commit('swOrderDetail/setLoading', ['order', false]);
+                    this.isLoadingCapture = false;
+                    this.closeCaptureModal();
+                    State.commit('swOrderDetail/setLoading', ['order', false]);
+                }, 2000);
+            });
+        },
+        refund() {
+            this.isLoadingRefund = true;
+            State.commit('swOrderDetail/setLoading', ['order', true]);
+            this.altaPayService.refund(this.orderId, this.refundAmount).then(response => {
+                if (response.Body.Result === 'Error') {
+                    this.errorMessage = response.Body.MerchantErrorMessage;
+                    return;
+                } else {
+                    this.successMessage = 'Refunded successfully.';
+                }
+                this.transaction = response.Body.Transactions.Transaction;
+                this.$emit('save-edits');
+            }).finally(() => {
+                setTimeout(() => {
+                    this.isLoadingRefund = false;
+                    this.closeRefundModal();
+                    State.commit('swOrderDetail/setLoading', ['order', false]);
                 }, 2000);
             });
         },
