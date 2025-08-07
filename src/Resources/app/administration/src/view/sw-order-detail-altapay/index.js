@@ -81,16 +81,16 @@ Shopware.Component.register('sw-order-detail-altapay', {
         },
         refund() {
           this.isLoadingRefund = true;
-            State.commit('swOrderDetail/setLoading', ['order', true]);
-            this.altaPayService.refund(this.orderId, this.refundAmount).then(response => {
-                if (response.Body.Result === 'Error') {
+          State.commit('swOrderDetail/setLoading', ['order', true]);
+          this.altaPayService.refund(this.orderId, this.refundAmount).then(response => {
+              if (response.Body.Result === 'Error') {
                   this.errorMessage = response.Body.MerchantErrorMessage;
                   return;
-                } else {
+              } else {
                   this.successMessage = 'Refunded successfully.';
-                }
-                this.transaction = response.Body.Transactions.Transaction;
-                this.$emit('save-edits');
+              }
+              this.transaction = response.Body.Transactions.Transaction;
+              this.$emit('save-edits');
             }).finally(() => {
                 setTimeout(() => {
                   this.isLoadingRefund = false;
