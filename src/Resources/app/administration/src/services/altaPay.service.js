@@ -24,11 +24,12 @@ class AltaPayService extends ApiService {
         ).then(response => ApiService.handleResponse(response));
     };
 
-    refund(orderId) {
+    refund(orderId, refundAmount) {
         return this.httpClient.post(
             `/${this.getApiBasePath()}/refund`,
             {
-                orderId
+                orderId,
+                refundAmount
             },
             {
                 headers: this.getBasicHeaders()
