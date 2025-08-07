@@ -43,6 +43,7 @@ class ApiController extends AbstractController
     public function capture(Request $request): JsonApiResponse|Response
     {
         $orderId = $request->get('orderId');
+        $captureAmount = $request->get('captureAmount');
         $context = Context::createDefaultContext();
         $criteria = new Criteria([$orderId]);
         $criteria->addAssociation('transactions')
@@ -51,14 +52,40 @@ class ApiController extends AbstractController
         if (!$order) {
             return new Response(status: 400);
         }
+
+        $transactionResponse      = $this->paymentService->getTransaction($order, $order->getSalesChannelId());
+        $transactionResponseAsXml = new \SimpleXMLElement($transactionResponse->getBody()->getContents());
+        $altaPayTransaction       = $transactionResponseAsXml->Body?->Transactions?->Transaction;
+
+        if (!$altaPayTransaction) {
+          return new Response(status: 400);
+        }
+
+        $orderTotal     = (float)$order->getAmountTotal();
+        $capturedAmount = (float)$altaPayTransaction->CapturedAmount;
+
+        $remainingAmount = $orderTotal - $capturedAmount;
+        if ($captureAmount > $remainingAmount) {
+          return new Response(status: 400);
+        }
+
         /** @var $order OrderEntity */
-        $response = $this->paymentService->captureReservation($order, $order->getSalesChannelId());
+        $response = $this->paymentService->captureReservation($order, $order->getSalesChannelId(), null, $captureAmount);
         $responseAsXml = new \SimpleXMLElement($response->getBody()->getContents());
         if ((string)$responseAsXml->Body?->Result === "Success") {
-            $this->orderTransactionStateHandler->paid(
-                $order->getTransactions()->first()->getId(), // todo get right transaction
-                $context
-            );
+            $capturedAmount = (float)$responseAsXml->Body->Transactions->Transaction->CapturedAmount;
+
+            if ($capturedAmount == $orderTotal) {
+                $this->orderTransactionStateHandler->paid(
+                    $order->getTransactions()->first()->getId(),
+                    $context
+                );
+            } else {
+                $this->orderTransactionStateHandler->payPartially(
+                    $order->getTransactions()->first()->getId(),
+                    $context
+                );
+            }
         }
         return new JsonApiResponse(json_encode($responseAsXml));
     }

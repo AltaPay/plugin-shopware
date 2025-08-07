@@ -48,6 +48,11 @@ class OrderStateChangeSubscriber implements EventSubscriberInterface
                 $orderTotal = $order->getAmountTotal();
                 $capturedAmount = (float)$altaPayTransaction->CapturedAmount;
 
+                if ($capturedAmount > 0) {
+                  $this->logger->error("Could not capture automatically. Manual capture is required for the order: " . $order->getId());
+                  return;
+                }
+
                 // Calculate the remaining amount that can be captured
                 $remainingAmount = $orderTotal - $capturedAmount;
 
