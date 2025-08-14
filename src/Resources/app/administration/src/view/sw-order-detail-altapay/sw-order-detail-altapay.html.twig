@@ -25,7 +25,7 @@
             <sw-container columns="1fr 1fr 1fr" gap="10px" align="center">
                 <div style="display: flex;justify-content: center;gap: 25px;">
                     <sw-button :disabled="isLoading || transaction.ReservedAmount === transaction.CapturedAmount" @click="openCaptureModal">{{ $tc("altaPay.capture") }}</sw-button>
-                    <sw-button :disabled="isLoading || transactionSource.transactions[0].stateMachineState.technicalName !== 'paid'" @click="refund">{{ $tc("altaPay.refund") }}</sw-button>
+                    <sw-button :disabled="isLoading || transaction.RefundedAmount === transaction.CapturedAmount" @click="openRefundModal">{{ $tc("altaPay.refund") }}</sw-button>
                     <sw-button :disabled="isLoading || !['open', 'in_progress', 'authorized'].includes(transactionSource.transactions[0].stateMachineState.technicalName)" @click="cancel">{{ $tc("altaPay.cancel") }}</sw-button>
                     <sw-modal v-if="showCaptureModal" @modal-close="closeCaptureModal" :title="$tc('altaPay.capture')"
                               variant="small">
@@ -49,11 +49,38 @@
                                 {{ $tc('global.default.cancel') }}
                             </sw-button>
 
-                            <sw-button @click="capture" variant="primary" size="small" :isLoading="isLoadingCapture">
+                            <sw-button :disabled="isLoadingCapture" @click="capture" variant="primary" size="small" :isLoading="isLoadingCapture">
                                 {{ $tc("altaPay.capture") }}
                             </sw-button>
                         </template>
                     </sw-modal>
+                    <sw-modal v-if="showRefundModal" @modal-close="closeRefundModal" :title="$tc('altaPay.refund')"
+                            variant="small">
+                    <div>
+                      <div>Amount:</div>
+                      <sw-number-field type="refundAmount"
+                                       numberType="float"
+                                       :allowEmpty="false"
+                                       v-model:value="refundAmount"
+                                       placeholder="Amount">
+                      </sw-number-field>
+                      <p v-if="successMessage" class="sw-field__success" style="color: #29de3b;">
+                        {{ successMessage }}
+                      </p>
+                      <p v-if="errorMessage" class="sw-field__error" style="color: #de294c;">
+                        {{ errorMessage }}
+                      </p>
+                    </div>
+                    <template #modal-footer>
+                      <sw-button @click="closeRefundModal" size="small">
+                        {{ $tc('global.default.cancel') }}
+                      </sw-button>
+
+                      <sw-button :disabled="isLoadingRefund" @click="refund" variant="primary" size="small" :isLoading="isLoadingRefund">
+                        {{ $tc("altaPay.refund") }}
+                      </sw-button>
+                    </template>
+                  </sw-modal>
                 </div>
             </sw-container>
     </sw-card-section>

@@ -14,7 +14,7 @@ Integrates your Shopware web shop to the AltaPay payments gateway.
 | Recurring / Unscheduled   | &cross;       |
 | Release                   | &check;       |
 | Refund                    | &check;       |
-| Multi Refund              | &cross;       |
+| Multi Refund              | &check;       |
 | 3D Secure                 | &check;       |
 | Fraud prevention (other)  | &check;       |
 | Reconciliation            | &check;       |
@@ -36,7 +36,7 @@ Integrates your Shopware web shop to the AltaPay payments gateway.
 
 ## Compatibility
 - Shopware 6.6.x (Tested version 6.6.10.5)
-- Shopware 6.7.x (Tested version 6.7.1.0)
+- Shopware 6.7.x (Tested version 6.7.1.1)
 
 ## Changelog
 See [Changelog](CHANGELOG.md) for all the release notes.

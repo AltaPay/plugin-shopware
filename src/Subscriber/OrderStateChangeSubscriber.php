@@ -94,6 +94,12 @@ class OrderStateChangeSubscriber implements EventSubscriberInterface
 
             $altaPayTransaction = $this->getAltaPayTransaction($order);
 
+            $refundedAmount = (float)$altaPayTransaction->RefundedAmount;
+            if ($refundedAmount > 0) {
+                $this->logger->error("Could not refund automatically. Manual refund is required for the order: " . $order->getId());
+                return;
+            }
+
             if ($altaPayTransaction && (float)$altaPayTransaction->CapturedAmount > 0.0 &&
                 (float)$altaPayTransaction->RefundedAmount < (float)$altaPayTransaction->CapturedAmount) {
 
