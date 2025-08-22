@@ -83,6 +83,7 @@ class CallbackController extends StorefrontController
             'title' => $this->translator->trans('altapay.gateway.title'),
             'orderNumberSnippet' => $this->translator->trans('altapay.gateway.orderNumber'),
             'totalPriceSnippet' => $this->translator->trans('altapay.gateway.totalPrice'),
+            'surchargeLabel' => $this->translator->trans('altapay.gateway.surcharge'),
             'context' => $salesChannelContext,
             'order' => $order,
         ];
