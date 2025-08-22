@@ -3,7 +3,8 @@
         "gateway": {
             "title": "Betalingsinformation",
             "orderNumber": "Ordrenummer:",
-            "totalPrice": "Total pris:"
+            "totalPrice": "Total pris:",
+            "surcharge": "Tillægsgebyr:"
         }
     }
 }

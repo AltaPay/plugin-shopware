@@ -170,6 +170,22 @@ class CustomFieldSetupService
             context: $context
         );
 
+        $this->addCustomField(
+            name: PaymentService::ALTAPAY_SURCHARGE_CUSTOM_FIELD,
+            type: CustomFieldTypes::SWITCH,
+            config: [
+                'label' => [
+                    'de-DE' => 'Surcharge',
+                    'en-GB' => 'Surcharge',
+                    'da-DK' => 'Surcharge',
+                ],
+                'customFieldPosition' => 3,
+                'defaultValue' => false,
+            ],
+            customFieldSetId: $fieldSetId,
+            context: $context
+        );
+
     }
 
     private function addCustomField(
