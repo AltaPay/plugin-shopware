@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [2.0.3]
+### Added
+- Support applying surcharge fee to order payments.
+
 ## [2.0.2]
 ### Added
 - Add support for multi/partial refund.

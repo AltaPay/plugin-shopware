@@ -37,6 +37,9 @@ use Shopware\Core\System\SalesChannel\Context\AbstractSalesChannelContextFactory
 use Shopware\Core\System\SalesChannel\Context\SalesChannelContextFactory;
 use Shopware\Core\System\SalesChannel\Context\SalesChannelContextService;
 use Shopware\Core\Checkout\Cart\Order\OrderConverter;
+use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\Checkout\Cart\Order\RecalculationService;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * Represents the Payment Method in Shopware,
@@ -47,6 +50,7 @@ class PaymentService extends AbstractPaymentHandler
     public const ALTAPAY_PAYMENT_ID_CUSTOM_FIELD = "wexoAltaPayPaymentId";
     public const ALTAPAY_TERMINAL_ID_CUSTOM_FIELD = "wexoAltaPayTerminalId";
     public const ALTAPAY_AUTO_CAPTURE_CUSTOM_FIELD = "wexoAltaPayAutoCapture";
+    public const ALTAPAY_SURCHARGE_CUSTOM_FIELD = "wexoAltaPaySurcharge";
     public const ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD = "wexoAltaPayTransactionId";
     public const ALTAPAY_TRANSACTION_PAYMENT_SCHEME_NAME_CUSTOM_FIELD = "wexoAltapayTransactionPaymentSchemeName";
     public const ALTAPAY_TRANSACTION_PAYMENT_NATURE_CUSTOM_FIELD = "wexoAltapayTransactionPaymentNature";
@@ -57,13 +61,16 @@ class PaymentService extends AbstractPaymentHandler
         protected readonly OrderTransactionStateHandler $orderTransactionStateHandler,
         protected readonly EntityRepository $orderRepository,
         protected readonly EntityRepository $orderAddressRepository,
+        protected readonly EntityRepository $orderLineItemRepository,
         protected readonly RouterInterface $router,
         protected readonly EntityRepository $languageRepository,
         protected readonly AbstractCartPersister $cartPersister,
         protected readonly ContainerInterface $container,
+        protected readonly TranslatorInterface $translator,
         protected readonly EntityRepository $orderTransactionRepository,
         protected readonly RequestStack $requestStack,
-        protected readonly AbstractSalesChannelContextFactory $salesChannelContextFactory
+        protected readonly AbstractSalesChannelContextFactory $salesChannelContextFactory,
+        private readonly RecalculationService $recalculationService
     ) {
     }
 
@@ -308,6 +315,50 @@ class PaymentService extends AbstractPaymentHandler
             self::ALTAPAY_TRANSACTION_PAYMENT_NATURE_CUSTOM_FIELD => $altaPayPaymentNature,
             self::ALTAPAY_PAYMENT_ID_CUSTOM_FIELD => $altaPayPaymentId
         ]);
+
+        $surchargeAmount = (float)$result->Body->Transactions->Transaction->SurchargeAmount;
+        $paymentMethod = $salesChannelContext->getPaymentMethod();
+        $surchargeEnabled = (bool)(($paymentMethod->getTranslated()['customFields'][self::ALTAPAY_SURCHARGE_CUSTOM_FIELD] ?? null));
+
+        if ($surchargeEnabled && $surchargeAmount > 0) {
+        $orderId       = $order->getId();
+        $systemContext = Context::createDefaultContext();
+
+        $versionId      = $this->orderRepository->createVersion($orderId, $systemContext);
+        $versionContext = $systemContext->createWithVersionId($versionId);
+
+        $lineItemId = Uuid::randomHex();
+        $identifier = 'altapay_fee_' . $lineItemId;
+
+        $this->orderLineItemRepository->upsert([[
+            'id' => $lineItemId,
+            'versionId' => $versionId,
+            'orderId' => $orderId,
+            'orderVersionId' => $versionId,
+            'type' => 'custom',
+            'identifier' => $identifier,
+            'label' => $this->translator->trans('altapay.gateway.surcharge'),
+            'quantity' => 1,
+            'price' => [
+            'unitPrice' => $surchargeAmount,
+            'totalPrice' => $surchargeAmount,
+            'quantity' => 1,
+            'calculatedTaxes' => [['tax' => 0.0, 'taxRate' => 0.0, 'price' => $surchargeAmount]],
+            'taxRules' => [['taxRate' => 0.0, 'percentage' => 100.0]],
+            ],
+            'priceDefinition' => [
+            'type' => 'quantity',
+            'price' => $surchargeAmount,
+            'quantity' => 1,
+            'taxRules' => [['taxRate' => 0.0, 'percentage' => 100.0]]
+            ]
+        ]], $versionContext);
+
+        $this->recalculationService->recalculate($orderId, $versionContext);
+
+        $this->orderRepository->merge($versionId, $systemContext);
+        }
+
         $this->orderRepository->update([
             [
                 'id' => $order->getId(),

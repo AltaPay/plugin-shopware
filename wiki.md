@@ -83,8 +83,7 @@ be provided by AltaPay.
 
 10. Click the **Save** button.
 
-11. Once saved, a new section **Custom fields** will appear with **Auto Capture** option and **AltaPay Terminal ID** field in which you must add the name of the terminal from AltaPay.  
-
+11. Once saved, a new section, **Custom fields**, will appear with the options **AltaPay Terminal ID**(where you must enter the terminal name from AltaPay), **Auto Capture**, and **Surcharge**.
     ![shopware_configure_altapay_terminal_detail](Docs/Configuration/shopware_configure_altapay_terminal_detail.png)
 
 12. Click the **Save** button again.
@@ -128,7 +127,7 @@ The new credentials can now be used as the API Username and API Password in the 
 - Shopware 6.6.x
 - Shopware 6.7.x
 
-The latest tested versions are `6.6.10.5` and `6.7.1.1`
+The latest tested versions are `6.6.10.5` and `6.7.1.2`
 
 ## Troubleshooting
 
