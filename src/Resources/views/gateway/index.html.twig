@@ -121,6 +121,12 @@
             select:focus-visible {
                 outline: none;
             }
+            .surcharge-amount {
+                visibility: hidden;
+            }
+            .Surcharged .surcharge-amount {
+               visibility: visible;
+            }
             @media screen and (max-width: 425px) {
                 .content-wrapper {
                     padding: 20px;
@@ -178,7 +184,12 @@
                     {% endblock %}
                     {% block altapay_body_content_price %}
                         <p class="custom-label">
-                            <span class="pensio_payment_form_label_cell">{{ gatewayData.totalPriceSnippet }}</span> {{ gatewayData.symbol }} {{ gatewayData.totalAmount }}
+                            <span class="pensio_payment_form_label_cell">{{ gatewayData.totalPriceSnippet }}</span> {{ gatewayData.symbol }} <span id="PensioTotal">{{ gatewayData.totalAmount }}</span>
+                        </p>
+                    {% endblock %}
+                    {% block altapay_body_content_surcharge %}
+                        <p class="custom-label surcharge-amount">
+                          <span class="pensio_payment_form_label_cell">{{ gatewayData.surchargeLabel }}</span> {{ gatewayData.symbol }} <span id="PensioSurcharge"></span>
                         </p>
                     {% endblock %}
 
