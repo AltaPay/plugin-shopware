@@ -11,6 +11,8 @@ use Shopware\Core\Checkout\Order\Aggregate\OrderLineItem\OrderLineItemEntity;
 use Shopware\Core\Checkout\Order\Aggregate\OrderTransaction\OrderTransactionEntity;
 use Shopware\Core\Checkout\Order\Aggregate\OrderTransaction\OrderTransactionStateHandler;
 use Shopware\Core\Checkout\Order\Aggregate\OrderTransaction\OrderTransactionStates;
+use Shopware\Core\System\StateMachine\StateMachineRegistry;
+use Psr\Log\LoggerInterface;
 use Shopware\Core\Checkout\Order\OrderEntity;
 use Shopware\Core\Checkout\Payment\PaymentException;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
@@ -59,6 +61,8 @@ class PaymentService extends AbstractPaymentHandler
     public function __construct(
         protected readonly SystemConfigService $systemConfigService,
         protected readonly OrderTransactionStateHandler $orderTransactionStateHandler,
+        protected readonly StateMachineRegistry $stateMachineRegistry,
+        protected readonly LoggerInterface $logger,
         protected readonly EntityRepository $orderRepository,
         protected readonly EntityRepository $orderAddressRepository,
         protected readonly EntityRepository $orderLineItemRepository,
@@ -77,6 +81,28 @@ class PaymentService extends AbstractPaymentHandler
     public function supports(PaymentHandlerType $type, string $paymentMethodId, Context $context): bool
     {
         return false;
+    }
+
+    /**
+     * Update order state to "in progress" when payment is successful
+     * Note: In Shopware, order state and transaction state are separate state machines
+     */
+    private function updateOrderStateToInProgress(OrderEntity $order, Context $context): void
+    {
+        try {
+            // Use the state machine registry to transition order state
+            $this->stateMachineRegistry->transition(
+                new \Shopware\Core\System\StateMachine\Transition(
+                    'order',
+                    $order->getId(),
+                    'process',
+                    'stateId'
+                ),
+                $context
+            );
+        } catch (\Exception $e) {
+            $this->logger->error("Error on updating order status ". $e->getMessage());
+        }
     }
 
     /**
@@ -254,11 +280,47 @@ class PaymentService extends AbstractPaymentHandler
                 }
 
                 $stateMachineState = $transaction->getStateMachineState();
-                if (
-                    $this->systemConfigService->getBool('WexoAltaPay.config.keepOrderOpen', $salesChannelContext->getSalesChannelId())
-                    || !$stateMachineState
-                    || $stateMachineState->getTechnicalName() !== OrderTransactionStates::STATE_OPEN
-                ) {
+                
+                // Debug logging to identify why status is not updating
+                $currentState = $stateMachineState ? $stateMachineState->getTechnicalName() : 'NULL';
+                
+                // Handle case when state machine state is NULL - force status update
+                if (!$stateMachineState) {
+                    // Force the transaction to open state first, then process
+                    $this->orderTransactionStateHandler->reopen(
+                        $transaction->getId(),
+                        $salesChannelContext->getContext()
+                    );
+                    
+                    // Now process to in_progress
+                    $this->orderTransactionStateHandler->process(
+                        $transaction->getId(),
+                        $salesChannelContext->getContext()
+                    );
+                    
+                    // Handle payment status
+                    if ($result->Body->Transactions->Transaction->CapturedAmount > 0) {
+                        $this->orderTransactionStateHandler->paid(
+                            $transaction->getId(),
+                            $salesChannelContext->getContext()
+                        );
+                        
+                        // Update order state to "in progress"
+                        $this->updateOrderStateToInProgress($order, $salesChannelContext->getContext());
+                    } elseif ($result->Body->Transactions->Transaction->ReservedAmount > 0) {
+                        $this->orderTransactionStateHandler->authorize(
+                            $transaction->getId(),
+                            $salesChannelContext->getContext()
+                        );
+                        
+                        // Update order state to "in progress"
+                        $this->updateOrderStateToInProgress($order, $salesChannelContext->getContext());
+                    }
+                    
+                    break;
+                }
+                
+                if ($stateMachineState->getTechnicalName() !== OrderTransactionStates::STATE_OPEN) {
                     break;
                 }
                 $this->orderTransactionStateHandler->process(
@@ -271,6 +333,9 @@ class PaymentService extends AbstractPaymentHandler
                         $transaction->getId(),
                         $salesChannelContext->getContext()
                     );
+
+                    // Update order state to "in progress"
+                    $this->updateOrderStateToInProgress($order, $salesChannelContext->getContext());
                 } elseif (!$is_notification and $allRequestParams['type'] == 'paymentAndCapture' and $allRequestParams['require_capture'] == 'true') {
                     $captureResponse = $this->captureReservation($order, $salesChannelContext->getSalesChannelId(), (string)$result->Body->Transactions->Transaction->TransactionId);
                     $captureResponseAsXml = new SimpleXMLElement($captureResponse->getBody()->getContents());
@@ -285,6 +350,9 @@ class PaymentService extends AbstractPaymentHandler
                         $transaction->getId(),
                         $salesChannelContext->getContext()
                     );
+                    
+                    // Update order state to "in progress"
+                    $this->updateOrderStateToInProgress($order, $salesChannelContext->getContext());
                 }
 
                 break;

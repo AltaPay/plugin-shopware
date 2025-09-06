@@ -46,15 +46,6 @@
             <label>AltaPay Password</label>
         </input-field>
     </card>
-    <card>
-        <title>Shopware Order</title>
-        <input-field type="bool">
-            <name>keepOrderOpen</name>
-            <label>Keep order in open state</label>
-            <helpText>Don't change the order state to Processing when customer has completed the payment flow</helpText>
-            <default>false</default>
-        </input-field>
-    </card>
 
     <card>
         <title>Payment gateway</title>
