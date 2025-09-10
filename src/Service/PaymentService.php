@@ -294,7 +294,7 @@ class PaymentService extends AbstractPaymentHandler
                         $transaction->getId(),
                         $salesChannelContext->getContext()
                     );
-                    
+
                     // Handle payment status
                     if ($result->Body->Transactions->Transaction->CapturedAmount > 0) {
                         $this->orderTransactionStateHandler->paid(
