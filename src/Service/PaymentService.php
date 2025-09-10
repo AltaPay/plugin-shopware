@@ -84,13 +84,11 @@ class PaymentService extends AbstractPaymentHandler
     }
 
     /**
-     * Update order state to "in progress" when payment is successful
-     * Note: In Shopware, order state and transaction state are separate state machines
+     * Update order state to "in progress" when payment is successful.
      */
     private function updateOrderStateToInProgress(OrderEntity $order, Context $context): void
     {
         try {
-            // Use the state machine registry to transition order state
             $this->stateMachineRegistry->transition(
                 new \Shopware\Core\System\StateMachine\Transition(
                     'order',
@@ -280,18 +278,17 @@ class PaymentService extends AbstractPaymentHandler
                 }
 
                 $stateMachineState = $transaction->getStateMachineState();
+
+                $currentState = $stateMachineState ? $stateMachineState->getTechnicalName() : null;
                 
-                // Debug logging to identify why status is not updating
-                $currentState = $stateMachineState ? $stateMachineState->getTechnicalName() : 'NULL';
-                
-                // Handle case when state machine state is NULL - force status update
+                // Handle case when state machine state is null - force status update
                 if (!$stateMachineState) {
                     // Force the transaction to open state first, then process
                     $this->orderTransactionStateHandler->reopen(
                         $transaction->getId(),
                         $salesChannelContext->getContext()
                     );
-                    
+
                     // Now process to in_progress
                     $this->orderTransactionStateHandler->process(
                         $transaction->getId(),
@@ -333,7 +330,6 @@ class PaymentService extends AbstractPaymentHandler
                         $transaction->getId(),
                         $salesChannelContext->getContext()
                     );
-
                     // Update order state to "in progress"
                     $this->updateOrderStateToInProgress($order, $salesChannelContext->getContext());
                 } elseif (!$is_notification and $allRequestParams['type'] == 'paymentAndCapture' and $allRequestParams['require_capture'] == 'true') {
@@ -350,11 +346,9 @@ class PaymentService extends AbstractPaymentHandler
                         $transaction->getId(),
                         $salesChannelContext->getContext()
                     );
-                    
                     // Update order state to "in progress"
                     $this->updateOrderStateToInProgress($order, $salesChannelContext->getContext());
                 }
-
                 break;
             case "Cancel":
                 throw PaymentException::customerCanceled(
