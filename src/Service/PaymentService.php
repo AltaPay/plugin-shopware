@@ -278,9 +278,7 @@ class PaymentService extends AbstractPaymentHandler
                 }
 
                 $stateMachineState = $transaction->getStateMachineState();
-
                 $currentState = $stateMachineState ? $stateMachineState->getTechnicalName() : null;
-                
                 // Handle case when state machine state is null - force status update
                 if (!$stateMachineState) {
                     // Force the transaction to open state first, then process
