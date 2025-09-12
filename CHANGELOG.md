@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [2.0.4]
+### Added
+- Change Shopware order status to In Progress on successful transaction.
+- Add a back button, on the payment form page.
+
 ## [2.0.3]
 ### Added
 - Support applying surcharge fee to order payments.

@@ -59,46 +59,42 @@ be provided by AltaPay.
 
     > **Note:** The **AltaPay ShopName** should match the subdomain at the beginning of your AltaPay URL. For example, if your payment URL is `https://demoshop.altapaysecure.com`, then the AltaPay ShopName is `demoshop`.
 
-3. Enable **Keep order in open state** setting if you don't want to change the order state to `Processing` when customer has completed the payment flow.
-
-   ![shopware_altapay_extension_configure_keep_order_open](Docs/Configuration/shopware_altapay_extension_configure_keep_order_open.png)
-
-4. To add the payment methods, go to **Settings** > **Shop** > **Payment methods**. This will fetch the list of payment methods for the checkout page.
+3. To add the payment methods, go to **Settings** > **Shop** > **Payment methods**. This will fetch the list of payment methods for the checkout page.
 
    ![shopware_payment_methods](Docs/Configuration/shopware_payment_methods.png)
 
-5. To set up a new payment method click on **Add payment method** button from the top-right corner.
+4. To set up a new payment method click on **Add payment method** button from the top-right corner.
 
    ![shopware_add_payment_method](Docs/Configuration/shopware_add_payment_method.png)
 
-6. When setting up a payment method you can select the **Name** and **Logo** that is going to be shown on the checkout page.
+5. When setting up a payment method you can select the **Name** and **Logo** that is going to be shown on the checkout page.
  
-7. The **Technical Name** is the name of the terminal from AltaPay. 
+6. The **Technical Name** is the name of the terminal from AltaPay. 
 
-8. In the optional field **Description**, you can add custom message for the customers. e.g. guidelines from Danish Forbrugerombudsmanden.
+7. In the optional field **Description**, you can add custom message for the customers. e.g. guidelines from Danish Forbrugerombudsmanden.
 
-9. Enable the option **Allow payment change after checkout** to allow users to retry payment using the same or different payment method in case it fails, or they cancel it.
+8. Enable the option **Allow payment change after checkout** to allow users to retry payment using the same or different payment method in case it fails, or they cancel it.
 
    ![shopware_terminal_config](Docs/Configuration/shopware_terminal_config.png)
 
-10. Click the **Save** button.
+9. Click the **Save** button.
 
-11. Once saved, a new section, **Custom fields**, will appear with the options **AltaPay Terminal ID**(where you must enter the terminal name from AltaPay), **Auto Capture**, and **Surcharge**.
+10. Once saved, a new section, **Custom fields**, will appear with the options **AltaPay Terminal ID**(where you must enter the terminal name from AltaPay), **Auto Capture**, and **Surcharge**.
     ![shopware_configure_altapay_terminal_detail](Docs/Configuration/shopware_configure_altapay_terminal_detail.png)
 
-12. Click the **Save** button again.
+11. Click the **Save** button again.
 
-13. Now click on your desired shop from the **Sales Channels** menu on the left.
+12. Now click on your desired shop from the **Sales Channels** menu on the left.
  
-14. In the **General** tab, scroll down to the **Payment and shipping** section & search by name for the payment method you just created.
+13. In the **General** tab, scroll down to the **Payment and shipping** section & search by name for the payment method you just created.
 
     ![shopware_show_payment_method_on_checkout.png](Docs/Configuration/shopware_show_payment_method_on_checkout.png)
 
-15. Choose the payment method and click Save button in the top-right corner.
+14. Choose the payment method and click Save button in the top-right corner.
 
     ![shopware_verify_payment_method.png](Docs/Configuration/shopware_verify_payment_method.png)
 
-16. Once the payment methods are configured, you will be ready to process transactions through AltaPay.
+15. Once the payment methods are configured, you will be ready to process transactions through AltaPay.
 
     ![shopware_checkout_page.png](Docs/Configuration/shopware_checkout_page.png)
 

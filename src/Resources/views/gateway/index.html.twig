@@ -127,6 +127,12 @@
             .Surcharged .surcharge-amount {
                visibility: visible;
             }
+            .altapay-back-to-shop {
+                margin: 30px 0;
+            }
+            .altapay-back-to-shop a {
+                text-decoration: none;
+            }
             @media screen and (max-width: 425px) {
                 .content-wrapper {
                     padding: 20px;
@@ -199,6 +205,15 @@
                 <form id="PensioPaymentForm">
                     <!--All content in here will be replaced by the actual payment form-->
                 </form>
+            {% endblock %}
+            {% block altapay_back_to_cart_button %}
+                <div class="col-md-4 altapay-back-to-shop">
+                    <a href="{{ path('frontend.checkout.cart.page') }}"
+                       class="btn btn-outline-primary header-minimal-back-to-shop-button"
+                       title="{{ 'checkout.finishButtonBackToShop'|trans|striptags }}">
+                        {{ 'checkout.finishButtonBackToShop'|trans|striptags }}
+                    </a>
+                </div>
             {% endblock %}
         </div>
     {% endblock %}
