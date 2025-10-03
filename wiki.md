@@ -16,6 +16,8 @@ Installing this plugin will enable the web shop to handle transactions through A
 
 [Configuration](#configuration)
 
+[Add Payment Methods](#add-payment-methods)
+
 [Supported versions](#supported-versions)
 
 [Troubleshooting](#troubleshooting)
@@ -59,42 +61,61 @@ be provided by AltaPay.
 
     > **Note:** The **AltaPay ShopName** should match the subdomain at the beginning of your AltaPay URL. For example, if your payment URL is `https://demoshop.altapaysecure.com`, then the AltaPay ShopName is `demoshop`.
 
-3. To add the payment methods, go to **Settings** > **Shop** > **Payment methods**. This will fetch the list of payment methods for the checkout page.
+3. Select the payment form logo to be displayed in the header of the payment form.
+
+4. From the Checkout Form Style dropdown, choose the preferred checkout form style.
+
+    `Legacy`
+   
+    ![legacy](Docs/Configuration/legacy.png)
+
+    `Checkout v1`
+   
+    ![Checkout v1](Docs/Configuration/checkout_v1.png)
+
+    `Checkout v2`
+   
+    ![Checkout v2](Docs/Configuration/checkout_v2.png)
+
+
+## Add Payment Methods
+
+1. To add the payment methods, go to **Settings** > **Shop** > **Payment methods**. This will fetch the list of payment methods for the checkout page.
 
    ![shopware_payment_methods](Docs/Configuration/shopware_payment_methods.png)
 
-4. To set up a new payment method click on **Add payment method** button from the top-right corner.
+2. To set up a new payment method click on **Add payment method** button from the top-right corner.
 
    ![shopware_add_payment_method](Docs/Configuration/shopware_add_payment_method.png)
 
-5. When setting up a payment method you can select the **Name** and **Logo** that is going to be shown on the checkout page.
+3. When setting up a payment method you can select the **Name** and **Logo** that is going to be shown on the checkout page.
  
-6. The **Technical Name** is the name of the terminal from AltaPay. 
+4. The **Technical Name** is the name of the terminal from AltaPay. 
 
-7. In the optional field **Description**, you can add custom message for the customers. e.g. guidelines from Danish Forbrugerombudsmanden.
+5. In the optional field **Description**, you can add custom message for the customers. e.g. guidelines from Danish Forbrugerombudsmanden.
 
-8. Enable the option **Allow payment change after checkout** to allow users to retry payment using the same or different payment method in case it fails, or they cancel it.
+6. Enable the option **Allow payment change after checkout** to allow users to retry payment using the same or different payment method in case it fails, or they cancel it.
 
    ![shopware_terminal_config](Docs/Configuration/shopware_terminal_config.png)
 
-9. Click the **Save** button.
+7. Click the **Save** button.
 
-10. Once saved, a new section, **Custom fields**, will appear with the options **AltaPay Terminal ID**(where you must enter the terminal name from AltaPay), **Auto Capture**, and **Surcharge**.
+8. Once saved, a new section, **Custom fields**, will appear with the options **AltaPay Terminal ID**(where you must enter the terminal name from AltaPay), **Auto Capture**, and **Surcharge**.
     ![shopware_configure_altapay_terminal_detail](Docs/Configuration/shopware_configure_altapay_terminal_detail.png)
 
-11. Click the **Save** button again.
+9. Click the **Save** button again.
 
-12. Now click on your desired shop from the **Sales Channels** menu on the left.
+10. Now click on your desired shop from the **Sales Channels** menu on the left.
  
-13. In the **General** tab, scroll down to the **Payment and shipping** section & search by name for the payment method you just created.
+11. In the **General** tab, scroll down to the **Payment and shipping** section & search by name for the payment method you just created.
 
     ![shopware_show_payment_method_on_checkout.png](Docs/Configuration/shopware_show_payment_method_on_checkout.png)
 
-14. Choose the payment method and click Save button in the top-right corner.
+12. Choose the payment method and click Save button in the top-right corner.
 
     ![shopware_verify_payment_method.png](Docs/Configuration/shopware_verify_payment_method.png)
 
-15. Once the payment methods are configured, you will be ready to process transactions through AltaPay.
+13. Once the payment methods are configured, you will be ready to process transactions through AltaPay.
 
     ![shopware_checkout_page.png](Docs/Configuration/shopware_checkout_page.png)
 
@@ -123,7 +144,7 @@ The new credentials can now be used as the API Username and API Password in the 
 - Shopware 6.6.x
 - Shopware 6.7.x
 
-The latest tested versions are `6.6.10.5` and `6.7.1.2`
+The latest tested versions are `6.6.10.5` and `6.7.2.2`
 
 ## Troubleshooting
 
