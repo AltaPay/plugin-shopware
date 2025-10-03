@@ -48,10 +48,29 @@
     </card>
 
     <card>
-        <title>Payment gateway</title>
-        <component name="sw-media-field">
-            <name>paymentGatewayMedia</name>
-            <label>Image for gateway</label>
-        </component>
+      <title>Checkout Settings</title>
+      <component name="sw-media-field">
+        <name>paymentGatewayMedia</name>
+        <label>Payment Form Logo</label>
+      </component>
+      <input-field type="single-select">
+        <name>checkoutStyle</name>
+        <label>Checkout Form Style</label>
+        <options>
+          <option>
+            <id>form_dynamic_div</id>
+            <name>Legacy</name>
+          </option>
+          <option>
+            <id>form_checkout_div</id>
+            <name>Checkout v1</name>
+          </option>
+          <option>
+            <id>form_checkout</id>
+            <name>Checkout v2</name>
+          </option>
+        </options>
+        <defaultValue>form_checkout_div</defaultValue>
+      </input-field>
     </card>
 </config>

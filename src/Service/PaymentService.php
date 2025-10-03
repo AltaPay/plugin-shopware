@@ -597,52 +597,61 @@ class PaymentService extends AbstractPaymentHandler
         }
 
         $salesChannelId = $context->getSalesChannelId();
+
+        $formParams = [
+          'type' => $paymentRequestType,
+          'terminal' => $terminal,
+          'language' => $languageCode ?? 'en',
+          'shop_orderid' => $order->getOrderNumber(),
+          'amount' => $totalAmount,
+          'currency' => $order->getCurrency()->getIsoCode(),
+          'config' => [
+            'callback_ok' => $returnUrl,
+            'callback_fail' => $gatewayErrorUrl,
+            'callback_open' => $returnUrl,
+            'callback_form' => $gatewayStyleUrl,
+            'callback_notification' => $gatewayNotificationUrl,
+            'callback_redirect' => $gatewayRedirectUrl,
+          ],
+          'orderLines' => $orderLines,
+          'customer_info' => [
+            'username' => $customer->getCustomerNumber(),
+            'shipping_lastname' => $shippingAddress->getLastName(),
+            'shipping_firstname' => $shippingAddress->getFirstName(),
+            'shipping_address' => $shippingAddress->getStreet(),
+            'shipping_postal' => $shippingAddress->getZipcode(),
+            'shipping_region' => $shippingAddress->getCountryState()?->getName() ?? '',
+            'shipping_country' => $context->getShippingLocation()?->getCountry()?->getIso(),
+            'shipping_city' => $shippingAddress->getCity(),
+            'email' => $customer->getEmail(),
+            'customer_phone' => $billingAddress->getPhoneNumber() ?? '',
+            'birthdate' => $customer->getCustomer()?->getBirthday()?->format('Y-m-d') ?? '',
+            'billing_lastname' => $billingAddress->getLastName(),
+            'billing_firstname' => $billingAddress->getFirstName(),
+            'billing_address' => $billingAddress->getStreet(),
+            'billing_city' => $billingAddress->getCity(),
+            'billing_region' => $billingAddress->getCountryState()?->getName() ?? '',
+            'billing_postal' => $billingAddress->getZipcode(),
+            'billing_country' => $billingAddress->getCountry()?->getIso() ?? $context->getCustomer()?->getActiveBillingAddress()?->getCountry()?->getIso(),
+          ],
+          'transaction_info' => [
+            'ecomPlatform' => 'Shopware',
+            'ecomVersion' => WexoAltaPay::getShopwareVersionFromComposer($this->container),
+            'ecomPluginName' => WexoAltaPay::ALTAPAY_PLUGIN_NAME,
+            'ecomPluginVersion' => WexoAltaPay::ALTAPAY_PLUGIN_VERSION,
+            'otherInfo' => WexoAltaPay::getShopName($this->systemConfigService, $salesChannelId),
+          ]
+        ];
+
+        $checkoutStyle = $this->systemConfigService->get('WexoAltaPay.config.checkoutStyle', $salesChannelId);
+        if (!empty($checkoutStyle)) {
+          $formParams['form_template'] = $checkoutStyle;
+        }
+
         $response = $this->getAltaPayClient($salesChannelId)->request('POST', 'createPaymentRequest', [
-            'form_params' => [
-                'type'=> $paymentRequestType,
-                'terminal' => $terminal,
-                'language' => $languageCode ?? 'en',
-                'shop_orderid' => $order->getOrderNumber(),
-                'amount' => $totalAmount,
-                'currency' => $order->getCurrency()->getIsoCode(),
-                'config' => [
-                    'callback_ok' => $returnUrl,
-                    'callback_fail' => $gatewayErrorUrl,
-                    'callback_open' => $returnUrl,
-                    'callback_form' => $gatewayStyleUrl,
-                    'callback_notification' => $gatewayNotificationUrl,
-                    'callback_redirect' => $gatewayRedirectUrl,
-                ],
-                'orderLines' => $orderLines,
-                'customer_info' => [
-                    'username' => $customer->getCustomerNumber(),
-                    'shipping_lastname' => $shippingAddress->getLastName(),
-                    'shipping_firstname' => $shippingAddress->getFirstName(),
-                    'shipping_address' => $shippingAddress->getStreet(),
-                    'shipping_postal' => $shippingAddress->getZipcode(),
-                    'shipping_region' => $shippingAddress->getCountryState()?->getName() ?? '',
-                    'shipping_country' => $context->getShippingLocation()?->getCountry()?->getIso(),
-                    'shipping_city' => $shippingAddress->getCity(),
-                    'email' => $customer->getEmail(),
-                    'customer_phone' => $billingAddress->getPhoneNumber() ?? '',
-                    'birthdate' => $customer->getCustomer()?->getBirthday()?->format('Y-m-d') ?? '',
-                    'billing_lastname' => $billingAddress->getLastName(),
-                    'billing_firstname' => $billingAddress->getFirstName(),
-                    'billing_address' => $billingAddress->getStreet(),
-                    'billing_city' => $billingAddress->getCity(),
-                    'billing_region' => $billingAddress->getCountryState()?->getName() ?? '',
-                    'billing_postal' => $billingAddress->getZipcode(),
-                    'billing_country' => $billingAddress->getCountry()?->getIso() ?? $context->getCustomer()?->getActiveBillingAddress()?->getCountry()?->getIso(),
-                ],
-                'transaction_info' => [
-                    'ecomPlatform' => 'Shopware',
-                    'ecomVersion' => WexoAltaPay::getShopwareVersionFromComposer($this->container),
-                    'ecomPluginName' => WexoAltaPay::ALTAPAY_PLUGIN_NAME,
-                    'ecomPluginVersion' => WexoAltaPay::ALTAPAY_PLUGIN_VERSION,
-                    'otherInfo' => WexoAltaPay::getShopName($this->systemConfigService, $salesChannelId),
-                ]
-            ]
+            'form_params' => $formParams
         ]);
+
         return new SimpleXMLElement($response->getBody()->getContents());
     }
 

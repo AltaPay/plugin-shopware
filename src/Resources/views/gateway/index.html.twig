@@ -36,121 +36,645 @@
     {% endblock %}
     {% block altapay_head_style_form %}
         <style>
+          .content-wrapper {
+            max-width: 400px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px 50px;
+          }
+
+          .heading-wrapper {
+            margin-top: 20px;
+          }
+
+          .heading-title {
+            margin: 30px 0 50px;
+          }
+
+          .pensio_payment_form_label_cell {
+            font-weight: bold;
+            font-size: 14px;
+          }
+
+          .pensio_payment_form_row {
+            margin-top: 20px;
+          }
+
+          #CreditCard {
+            width: 100%;
+            overflow: hidden;
+          }
+
+          #cardholderNameInput,
+          #creditCardNumberInput {
+            width: 100%;
+          }
+
+          #selectCardLabel,
+          #creditCardTypeSecondIcon,
+          #creditCardTypeIcon {
+            display: none;
+          }
+
+          #pensioCreditCardPaymentSubmitButton,
+          #submitbutton,
+          #MobilePaymentFormSubmit {
+            border-radius: 0;
+            padding: 15px;
+            width: 100%;
+            border: none;
+          }
+
+          td.pensio_payment_form_label_cell {
+            vertical-align: top;
+          }
+
+          td.pensio_payment_form_input_cell {
+            display: flex;
+            flex-direction: column;
+          }
+
+          #pensioCreditCardPaymentSubmitButton:not(:disabled),
+          #submitbutton:not(:disabled),
+          #MobilePaymentFormSubmit:not(:disabled) {
+            background-color: #40ba8d;
+            color: #fff;
+          }
+
+          #pensioCreditCardPaymentSubmitButton:not(:disabled):hover,
+          #submitbutton:not(:disabled):hover,
+          #MobilePaymentFormSubmit:not(:disabled):hover {
+            background-color: #47d5a0;
+          }
+
+          #pensioCreditCardPaymentSubmitButton:disabled,
+          #MobilePaymentFormSubmit:disabled {
+            background-color: #dedede;
+          }
+
+          #cvcInput {
+            width: 50%;
+          }
+
+          .pensio_payment_form_input_cell select {
+            width: 40%;
+            padding: 5px 0;
+          }
+
+          .custom-label {
+            font-size: 13px;
+          }
+
+          input[type="text"],
+          input[type="tel"],
+          select {
+            border-width: 0 0 1px;
+            border-color: #000;
+            padding-inline: 0;
+          }
+
+          input[type="text"]:focus-visible,
+          input[type="tel"]:focus-visible,
+          select:focus-visible {
+            outline: none;
+          }
+
+          .surcharge-amount {
+            visibility: hidden;
+          }
+
+          .Surcharged .surcharge-amount {
+            visibility: visible;
+          }
+
+          .altapay-back-to-shop {
+            margin: 30px 0;
+            text-align: left;
+          }
+
+          .altapay-back-to-shop a {
+            text-decoration: none;
+          }
+
+          @media screen and (max-width: 425px) {
             .content-wrapper {
-                max-width: 400px;
-                margin: 0 auto;
-                background-color: #fff;
-                padding: 20px 50px;
+              padding: 20px;
             }
-            .heading-wrapper {
-                margin-top: 20px;
+          }
+
+          #PensioJavascriptDisabledSurchargeNotice,
+          #invalid_cvc,
+          #invalid_cardholdername {
+            color: red;
+            background-color: white;
+          }
+
+          .info-wrapper, div#savecreditcard,
+          .pensio_payment_form_row.expiry_row {
+            text-align: left;
+          }
+
+          #cvcInput {
+            width: 100%;
+          }
+
+          .checkout-style .pensio_payment_form_row {
+            margin-top: 0;
+          }
+
+          .checkout-style .pensio_payment_form_card-number input,
+          .checkout-style .pensio_payment_form_cardholder input,
+          .checkout-style .pensio_payment_form_input_cell input {
+            box-sizing: border-box;
+            color: #666;
+            box-shadow: none !important;
+          }
+
+          .checkout-style .pensioCreditCardInput {
+            color: #666;
+          }
+
+          .checkout-style .pensio_payment_form_month select,
+          .checkout-style .pensio_payment_form_year select,
+          .checkout-style #idealIssuer {
+            border-radius: 3px;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: linear-gradient(45deg, transparent 50%, black 50%),
+            linear-gradient(135deg, black 50%, transparent 50%);
+            background-position: calc(100% - 20px) calc(20px + 2px),
+            calc(100% - 15px) calc(20px + 2px),
+            100% 0;
+            background-size: 5px 5px, 5px 5px, 40px 40px;
+            background-repeat: no-repeat;
+          }
+
+          .checkout-style .pensio_payment_form_card-number input,
+          .checkout-style .pensio_payment_form_cardholder input,
+          .checkout-style .pensio_payment_form_input_cell input,
+          .checkout-style .pensio_payment_form_month select,
+          .checkout-style .pensio_payment_form_year select,
+          .checkout-style #idealIssuer,
+          .checkout-style .pensio_payment_form-cvc-input input#cvcInput {
+            border: 1px solid rgba(0, 0, 0, 0.16);
+            border-radius: 3px;
+            padding: 15px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 4px;
+            width: 100%;
+            height: auto;
+          }
+
+          .checkout-style .pensio_payment_form_expiration {
+            display: flex;
+            width: 100%;
+            gap: 0 10px;
+          }
+
+          .checkout-style .pensio_payment_form_month {
+            width: 30%;
+
+          }
+
+          .checkout-style .pensio_payment_form_year {
+            width: 30%;
+
+          }
+
+          .checkout-style .pensio_payment_form_cvc {
+            width: 40%;
+          }
+
+          .checkout-style .pensio_payment_form-cvc-input {
+            display: flex;
+            position: relative;
+          }
+
+          .checkout-style .cvc-icon {
+            width: 30px;
+            position: absolute;
+            top: 20px;
+            right: 15px;
+          }
+
+          .checkout-style .credit-card-visa-icon {
+            position: absolute;
+            top: 0;
+            right: 0;
+            display: flex;
+            padding-right: 7px;
+            padding-top: 14px;
+            align-items: center;
+          }
+
+          .checkout-style .credit-card-mastercard-icon {
+            position: absolute;
+            top: 0;
+            right: 0;
+            display: flex;
+            padding-right: 50px;
+            padding-top: 14px;
+            align-items: center;
+          }
+
+          .checkout-style .credit-card-maestro-icon {
+            position: absolute;
+            top: 0;
+            right: 0;
+            display: flex;
+            padding-right: 90px;
+            padding-top: 14px;
+            align-items: center;
+          }
+
+          .checkout-style #creditCardTypeIcon {
+            height: 40%;
+            width: auto;
+            position: absolute;
+            display: flex;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            margin: auto 1rem auto auto;
+          }
+
+          .checkout-style #creditCardTypeSecondIcon {
+            height: 40%;
+            width: auto;
+            position: absolute;
+            display: flex;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            margin: auto 4rem auto auto;
+          }
+
+          .checkout-style #selectCardLabel {
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            margin: 0 2rem 2px 0;
+            font-size: 10px;
+            opacity: 0.7;
+          }
+
+          .checkout-style .pensio_payment_form_cvc-info-text {
+            font-size: 10px;
+            line-height: normal;
+            margin-top: 4px;
+            margin-bottom: 4px;
+          }
+
+          .checkout-style .pensio_payment_form_label_cell {
+            font-size: 16px
+          }
+
+          .checkout-style .cardholdername_row,
+          .checkout-style .expiry_row,
+          .checkout-style .cardnumber_row {
+            margin-top: 10px;
+          }
+
+          .checkout-style .expiry_row,
+          .checkout-style .cardnumber_row {
+            margin-top: 10px;
+          }
+
+          .checkout-style .cardnumber_row {
+            margin-bottom: 20px;
+          }
+
+          .checkout-style .expiry_row {
+            display: flex;
+            width: 100%;
+            gap: 0 10px;
+          }
+
+          .checkout-style .submit_row {
+            margin-top: 20px;
+          }
+
+          .checkout-style .AltaPaySubmitButton,
+          .checkout-style #submitbutton,
+          .checkout-style #cancelPayment {
+            outline: none;
+            padding: 15px 16px;
+            color: white;
+            border-radius: 3px;
+            width: 100%;
+            border: none;
+            cursor: pointer;
+            box-shadow: rgba(0, 0, 0, 0.16) 0 1px 4px;
+            font-weight: bold;
+            font-size: 17px;
+          }
+
+          .checkout-style .AltaPaySubmitButton {
+            background: #31C37E;
+          }
+
+          .checkout-style .AltaPaySubmitButton:hover {
+            background: #16b36e;
+          }
+
+          .checkout-style .AltaPaySubmitButton:disabled,
+          .checkout-style #submitbutton,
+          .checkout-style #cancelPayment,
+          .checkout-style #submitbutton:disabled {
+            background: black;
+          }
+
+          /*errors*/
+          .checkout-style .pensio_required_field_indicator,
+          .checkout-style #invalid_amex_cvc,
+          .checkout-style #invalid_cvc,
+          .checkout-style #invalid_cardholdername,
+          .checkout-style #invalid_expire_month,
+          .checkout-style #invalid_expire_year {
+            color: red;
+            font-size: 12px;
+            line-height: normal;
+          }
+
+          .checkout-style .pensio_payment_form_invalid-cvc-input,
+          .checkout-style .pensio_payment_form_invalid-cardholder-input {
+            color: red;
+          }
+
+          .checkout-style .PensioCloseButton,
+          .checkout-style .CustomAltaPayCloseButton {
+            width: 40px;
+            height: 20px;
+            font-size: 18px;
+            background-color: red;
+            color: white;
+            cursor: pointer;
+            padding: 4px;
+            position: absolute;
+            right: 0;
+            top: 0;
+          }
+
+          .checkout-style .PensioRadioButton {
+            border: none;
+            background-color: transparent;
+            cursor: pointer;
+          }
+
+          .checkout-style div.PensioMultiformContainer form {
+            display: none;
+          }
+
+          .checkout-style #PensioJavascriptDisabledSurchargeNotice {
+            color: red;
+            background-color: white;
+          }
+
+          .checkout-style #iDealPayment table {
+            width: 100%;
+          }
+
+          .checkout-style #iDealPayment table tr td {
+            vertical-align: middle;
+          }
+
+          .checkout-style #iDealPayment #pensioPaymentIdealSubmitButton {
+            margin-top: 20px;
+          }
+
+          .checkout-style #idealIssuer select {
+            color: #666;
+          }
+
+          .checkout-style select#birthdateDay,
+          .checkout-style select#birthdateMonth,
+          .checkout-style input#cancelPayment,
+          .checkout-style input#enableAccount,
+          .checkout-style input#acceptTerms,
+          .checkout-style input#phoneNumber {
+            margin-bottom: 10px;
+          }
+
+          .checkout-style div.PensioMultiformContainer form {
+            position: relative;
+            border: none;
+            background-color: white;
+            padding: 0;
+            margin: 0;
+            border-radius: 0;
+            top: 0;
+            width: 100%;
+          }
+
+          .checkout-style input#CreditCardButton {
+            left: 0px;
+          }
+
+          .checkout-style input#GiftCardButton {
+            left: 100px;
+          }
+
+          .checkout-style div.PensioMultiformContainer .FormTypeButton {
+            position: absolute;
+            top: -32px;
+            height: 32px;
+            margin-left: 25px;
+            border: 1px solid rgba(0, 0, 0, 0.16);
+          }
+
+          .checkout-style div.PensioMultiformContainer {
+            position: initial;
+          }
+
+          .checkout-style .pensio_payment_form_input_cell.pensio_payment_form_card-number {
+            position: relative;
+          }
+
+          .checkout-style .heading-title {
+            margin: 30px 0;
+          }
+
+          .checkout-style .heading-wrapper {
+            display: none;
+          }
+
+          .checkout-style .content-wrapper {
+            max-width: 500px;
+            padding: 15px 50px;
+          }
+
+          span.secure-payments-text {
+            font-size: 10px !important;
+            text-align: right;
+            display: block;
+            margin-top: 8px;
+          }
+
+          .checkout-style #pensioCreditCardPaymentSubmitButton,
+          .checkout-style #submitbutton,
+          .checkout-style #MobilePaymentFormSubmit {
+            border-radius: 3px;
+            padding: 15px;
+            width: 100%;
+            border: none;
+          }
+
+          .checkout-style #pensioCreditCardPaymentSubmitButton:disabled,
+          .checkout-style #MobilePaymentFormSubmit:disabled {
+            background-color: black;
+          }
+
+          .checkout-v2 .pensio_payment_form_row {
+            margin-bottom: 0;
+          }
+
+          .checkout-v2 .pensio_payment_form-date {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            font-family: monospace !important;
+            border: 1px solid rgba(0, 0, 0, 0.16);
+            border-top: 0;
+            border-bottom-left-radius: 4px;
+            border-bottom-right-radius: 0px;
+          }
+
+          .checkout-v2 .separator {
+            color: #a9a9ac;
+          }
+
+          .checkout-v2 .pensio_payment_form_year {
+            width: 25%;
+          }
+
+          .checkout-v2 .pensio_payment_form_card-number input {
+            padding: 16px 14px;
+            width: 100%;
+            cursor: pointer;
+            font-size: 16px;
+            box-sizing: border-box;
+            color: #666;
+            border-radius: 4px;
+            border: 1px solid rgba(0, 0, 0, 0.16);
+            border-bottom-left-radius: 0;
+            border-bottom-right-radius: 0;
+            outline: none;
+            height: 51px;
+            box-shadow: none;
+          }
+
+          .checkout-v2 .pensio_payment_form_card-number,
+          .checkout-v2 .pensio_payment_form_cardholder,
+          .checkout-v2 .pensio_payment_form-cvc-input input#cvcInput {
+            margin-top: 0 !important;
+          }
+
+          .checkout-v2 .pensio_payment_form_cardholder input {
+            color: #666;
+            outline: none;
+            height: 51px;
+            box-shadow: none;
+          }
+
+          .checkout-v2 .pensio_payment_form-cvc-input input#cvcInput {
+            padding: 16px 14px;
+            height: 52px;
+            box-sizing: border-box;
+            width: 100%;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.16) !important;
+            border-right: 1px solid rgba(0, 0, 0, 0.16) !important;
+            border-radius: 4px;
+            border-top: 0;
+            cursor: pointer;
+            font-size: 16px;
+            border-left: none;
+            border-bottom-left-radius: 0;
+            border-top-right-radius: 0;
+            outline: none;
+            color: #666;
+            box-shadow: none;
+          }
+
+          .checkout-v2 .expire-month, .checkout-v2 #emonth {
+            height: 51px;
+            padding-top: 16px;
+            padding-bottom: 16px;
+            padding-left: 2px !important;
+            margin: auto 4px auto 14px;
+            font-family: monospace !important;
+            width: 100%;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            font-size: 16px;
+            box-shadow: none !important;
+            box-sizing: border-box;
+            color: #666;
+          }
+
+          .checkout-v2 .expiry-year {
+            padding: 16px 4px;
+            height: 51px;
+            width: 100%;
+            border: none;
+            outline: none;
+            font-family: monospace !important;
+            cursor: pointer;
+            font-size: 16px;
+            box-sizing: border-box;
+            color: #666;
+          }
+
+          .checkout-v2 .pensio_payment_form_month {
+            width: 20%;
+            max-width: 40px;
+          }
+
+          .checkout-v2 .pensio_payment_form_cvc {
+            width: 50%;
+          }
+
+          .checkout-v2 .pensio_payment_form_row.expiry_row {
+            float: none;
+            margin-top: 0;
+            gap: 0;
+            justify-content: space-between;
+            margin-bottom: 15px;
+          }
+
+          .checkout-v2 .secure-payments-text {
+            width: 100%;
+            position: relative;
+            float: left;
+            text-align: right;
+            font-size: 10px;
+            padding-top: 5px;
+          }
+
+          .checkout-v2 div.payment-form-wrapper {
+            padding: 25px 25px 25px 25px !important;
+            display: inline-block;
+            width: 100%;
+          }
+
+          .checkout-v2 .pensio_payment_form_cvc,
+          .checkout-v2 .pensio_payment_form_date-container {
+            width: 50%;
+          }
+
+          @media (max-width: 991px) {
+            .checkout-style {
+              margin-top: 15px;
             }
-            .heading-title {
-                margin: 30px 0 50px;
-            }
-            .pensio_payment_form_label_cell {
-                font-weight: bold;
-                font-size: 14px;
-            }
-            .pensio_payment_form_row {
-                margin-top: 20px;
-            }
-            #CreditCard {
-                width: 100%;
-                overflow: hidden;
-            }
-            #cardholderNameInput,
-            #creditCardNumberInput {
-                width: 100%;
-            }
-            #selectCardLabel,
-            #creditCardTypeSecondIcon,
-            #creditCardTypeIcon {
-                display: none;
-            }
-            #pensioCreditCardPaymentSubmitButton,
-            #submitbutton,
-            #MobilePaymentFormSubmit {
-                border-radius: 0;
-                padding: 10px 20px;
-                width: 100%;
-                border: none;
-                margin-top: 30px;
-            }
-            td.pensio_payment_form_label_cell {
-                vertical-align: top;
-            }
-            td.pensio_payment_form_input_cell {
-                display: flex;
-                flex-direction: column;
-            }
-            #pensioCreditCardPaymentSubmitButton:not(:disabled),
-            #submitbutton:not(:disabled),
-            #MobilePaymentFormSubmit:not(:disabled){
-                background-color: #40ba8d;
-                color: #fff;
-            }
-            #pensioCreditCardPaymentSubmitButton:not(:disabled):hover,
-            #submitbutton:not(:disabled):hover,
-            #MobilePaymentFormSubmit:not(:disabled):hover{
-                background-color: #47d5a0;
-            }
-            #pensioCreditCardPaymentSubmitButton:disabled,
-            #MobilePaymentFormSubmit:disabled{
-                background-color: #dedede;
-            }
-            #cvcInput {
-                width: 50%;
-            }
-            .pensio_payment_form_input_cell select {
-                width: 40%;
-                padding: 5px 0;
-            }
-            .custom-label {
-                font-size: 13px;
-            }
-            input[type="text"],
-            input[type="tel"],
-            select {
-                border-width: 0 0 1px;
-                border-color: #000;
-                padding-inline: 0;
-            }
-            input[type="text"]:focus-visible,
-            input[type="tel"]:focus-visible,
-            select:focus-visible {
-                outline: none;
-            }
-            .surcharge-amount {
-                visibility: hidden;
-            }
-            .Surcharged .surcharge-amount {
-               visibility: visible;
-            }
-            .altapay-back-to-shop {
-                margin: 30px 0;
-            }
-            .altapay-back-to-shop a {
-                text-decoration: none;
-            }
-            @media screen and (max-width: 425px) {
-                .content-wrapper {
-                    padding: 20px;
-                }
-            }
-            #PensioJavascriptDisabledSurchargeNotice,
-            #invalid_cvc,
-            #invalid_cardholdername {
-                color: red;
-                background-color: white;
-            }
+          }
         </style>
     {% endblock %}
 </head>
 {% endblock %}
 
 {% block altapay_body %}
-    <body>
+    <body class="{{ gatewayData.formTemplateClass }}">
     {% block altapay_body_image %}
         {% block altapay_layout_header %}
             {% if gatewayData.media !== '' %}
