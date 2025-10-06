@@ -2,7 +2,9 @@
 {% block altapay_head %}
 <html lang="{{ gatewayData.languageCode }}">
 <head>
-    {% block altapay_head_title %}
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% block altapay_head_title %}
         <title>{{ gatewayData.title }}</title>
     {% endblock %}
 
@@ -148,7 +150,7 @@
           }
 
           .altapay-back-to-shop {
-            margin: 30px 0;
+            margin: 15px 0;
             text-align: left;
           }
 
@@ -333,12 +335,7 @@
           .checkout-style .cardholdername_row,
           .checkout-style .expiry_row,
           .checkout-style .cardnumber_row {
-            margin-top: 10px;
-          }
-
-          .checkout-style .expiry_row,
-          .checkout-style .cardnumber_row {
-            margin-top: 10px;
+            margin-top: 0;
           }
 
           .checkout-style .cardnumber_row {
@@ -542,7 +539,7 @@
           .checkout-v2 #pensioCreditCardPaymentSubmitButton,
           .checkout-v2 #submitbutton,
           .checkout-v2 #MobilePaymentFormSubmit {
-            padding: 23px;
+            padding: 16px;
           }
 
           .checkout-style #pensioCreditCardPaymentSubmitButton:disabled,
@@ -579,7 +576,7 @@
           .checkout-v2 .pensio_payment_form-cvc-input input#cvcInput,
           .checkout-v2 .pensio_payment_form_cardholder input {
             cursor: pointer;
-            height: 65px;
+            height: 52px;
             font-size: 16px;
             color: #666;
           }
@@ -609,7 +606,7 @@
 
           .checkout-v2 .pensio_payment_form-cvc-input input#cvcInput {
             padding: 16px 14px;
-            height: 66px;
+            height: 53px;
             box-sizing: border-box;
             width: 100%;
             border-bottom: 1px solid rgba(0, 0, 0, 0.16) !important;
@@ -674,14 +671,15 @@
 
           .checkout-style .payment-form-wrapper {
             background-color: white;
-            padding: 30px 60px;
+            padding: 30px 40px;
             border-radius: 15px;
           }
 
           .checkout-v2 div.payment-form-wrapper {
-            padding: 25px 25px 25px 25px !important;
+            padding: 10px 25px 10px 25px !important;
             display: inline-block;
             width: 100%;
+            max-width: 600px;
           }
 
           .checkout-v2 .pensio_payment_form_cvc,
@@ -689,9 +687,16 @@
             width: 50%;
           }
 
-          @media (max-width: 991px) {
-            .checkout-style {
-              margin-top: 15px;
+          @media screen and (max-width: 768px) {
+            .checkout-style .content-wrapper {
+              max-width: 100%;
+              flex-direction: unset;
+            }
+            .checkout-style div.payment-form-wrapper {
+              border-radius: 0;
+              padding: 0 30px 0 30px !important;
+              max-width: 100%;
+              width: 100%;
             }
           }
         </style>
@@ -759,7 +764,7 @@
             {% endblock %}
             {% block altapay_back_to_cart_button %}
                 <div class="col-md-4 altapay-back-to-shop">
-                    <a href="{{ path('frontend.checkout.cart.page') }}"
+                    <a href="{{ gatewayData.cancelUrl }}"
                        class="btn btn-outline-primary header-minimal-back-to-shop-button"
                        title="{{ 'checkout.finishButtonBackToShop'|trans|striptags }}">
                         {{ 'checkout.finishButtonBackToShop'|trans|striptags }}

@@ -79,11 +79,18 @@ class SalesChannelAuthenticationListener implements EventSubscriberInterface
 
         $orderNumber = $request->get('shop_orderid');
         if (!$orderNumber) {
-            try {
-                $result = new SimpleXMLElement($request->get('xml'));
-                $orderNumber = (string)$result->Body?->Transactions?->Transaction?->ShopOrderId;
-            } catch (Exception) {
-            }
+          $xmlContent = $request->get('xml');
+
+          if (empty($xmlContent) || !is_string($xmlContent)) {
+            return;
+          }
+
+          try {
+            $result = new SimpleXMLElement($xmlContent);
+            $orderNumber = (string)($result->Body?->Transactions?->Transaction?->ShopOrderId ?? '');
+          } catch (Exception) {
+            return;
+          }
         }
 
         if (!$orderNumber) {
