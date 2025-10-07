@@ -32,7 +32,8 @@
                 margin: auto;
             }
             .header-minimal-logo img {
-                width: 100%;
+              width: 100%;
+              max-width: 120px;
             }
         </style>
     {% endblock %}
@@ -770,17 +771,13 @@
                     <!--All content in here will be replaced by the actual payment form-->
                 </form>
             {% endblock %}
-            {% block altapay_back_to_cart_button %}
-              {% if 'checkout.finishButtonBackToShop'|trans != 'checkout.finishButtonBackToShop' %}
-                <div class="col-md-4 altapay-back-to-shop">
-                  <a href="{{ path('frontend.checkout.cart.page') }}"
-                    class="btn btn-outline-primary header-minimal-back-to-shop-button"
-                    title="{{ 'checkout.finishButtonBackToShop'|trans|striptags }}">
-                    {{ 'checkout.finishButtonBackToShop'|trans|striptags }}
-                  </a>
-                </div>
-              {% endif %}
-            {% endblock %}
+            {% if 'checkout.finishButtonBackToShop'|trans != 'checkout.finishButtonBackToShop' %}
+              <a href="{{ path('frontend.checkout.cart.page') }}"
+                 class="btn btn-outline-primary header-minimal-back-to-shop-button"
+                 title="{{ 'checkout.finishButtonBackToShop'|trans|striptags }}">
+                {{ 'checkout.finishButtonBackToShop'|trans|striptags }}
+              </a>
+            {% endif %}
         </div>
       </div>
     {% endblock %}
