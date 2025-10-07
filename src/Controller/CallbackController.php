@@ -36,8 +36,7 @@ class CallbackController extends StorefrontController
         protected readonly RouterInterface $router,
         protected readonly TranslatorInterface $translator,
         protected readonly SystemConfigService $systemConfigService,
-        protected readonly EntityRepository $mediaRepository,
-        protected readonly CartService $cartService
+        protected readonly EntityRepository $mediaRepository
     ) {
     }
 
@@ -83,12 +82,6 @@ class CallbackController extends StorefrontController
 
         $formTemplateClass = $map[$formTemplate] ?? '';
 
-        $cart = $this->cartService->getCart($salesChannelContext->getToken(), $salesChannelContext);
-
-        $cancelUrl = $this->router->generate('frontend.payment.cancel', [
-          'cart_token' => $cart->getToken(),
-        ], UrlGeneratorInterface::ABSOLUTE_URL);
-
         $data = [
             'shopName' => $salesChannelContext->getSalesChannel()->getName(),
             'shopOrderId' => $orderNumber,
@@ -103,8 +96,7 @@ class CallbackController extends StorefrontController
             'surchargeLabel' => $this->translator->trans('altapay.gateway.surcharge'),
             'context' => $salesChannelContext,
             'order' => $order,
-            'formTemplateClass' => $formTemplateClass,
-            'cancelUrl' => $cancelUrl
+            'formTemplateClass' => $formTemplateClass
         ];
 
         return $this->render('@WexoAltaPay/gateway/index.html.twig', ['gatewayData' => $data]);
@@ -184,30 +176,5 @@ class CallbackController extends StorefrontController
         $allRequestParams = array_merge($request->query->all(), $request->request->all());
         $this->paymentService->transactionCallback($result, $order, $transaction, $salesChannelContext, $allRequestParams, true);
         return new Response("Acknowledged", 200);
-    }
-
-    #[Route(
-      path: '/payment/cancel',
-      name: 'frontend.payment.cancel',
-      defaults: ['auth_required' => false],
-      methods: ['GET']
-    )]
-    public function cancel(Request $request, SalesChannelContext $salesChannelContext): RedirectResponse
-    {
-      $token = $request->query->get('cart_token');
-
-      if ($token) {
-        try {
-          $cart = $this->cartService->getCart($token, $salesChannelContext);
-
-          $this->cartService->recalculate($cart, $salesChannelContext);
-        } catch (\Throwable $e) {
-          $this->logger->error('Cart restore failed on cancel URL', [
-            'error' => $e->getMessage()
-          ]);
-        }
-      }
-
-      return $this->redirectToRoute('frontend.checkout.cart.page');
     }
 }

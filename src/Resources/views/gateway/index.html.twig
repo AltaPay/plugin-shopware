@@ -691,7 +691,7 @@
             margin-bottom: 25px;
           }
 
-          .Surcharged.checkout-v2 .surcharge-amount {
+          .checkout-v2 .surcharge-amount {
             display: none;
           }
 
@@ -771,13 +771,15 @@
                 </form>
             {% endblock %}
             {% block altapay_back_to_cart_button %}
+              {% if 'checkout.finishButtonBackToShop'|trans != 'checkout.finishButtonBackToShop' %}
                 <div class="col-md-4 altapay-back-to-shop">
-                    <a href="{{ gatewayData.cancelUrl }}"
-                       class="btn btn-outline-primary header-minimal-back-to-shop-button"
-                       title="{{ 'checkout.finishButtonBackToShop'|trans|striptags }}">
-                        {{ 'checkout.finishButtonBackToShop'|trans|striptags }}
-                    </a>
+                  <a href="{{ path('frontend.checkout.cart.page') }}"
+                    class="btn btn-outline-primary header-minimal-back-to-shop-button"
+                    title="{{ 'checkout.finishButtonBackToShop'|trans|striptags }}">
+                    {{ 'checkout.finishButtonBackToShop'|trans|striptags }}
+                  </a>
                 </div>
+              {% endif %}
             {% endblock %}
         </div>
       </div>
