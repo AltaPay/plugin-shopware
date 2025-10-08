@@ -24,7 +24,6 @@ use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 use Wexo\AltaPay\Service\PaymentService;
-use Shopware\Core\Checkout\Cart\SalesChannel\CartService;
 
 #[Route(defaults: ['_routeScope' => ['storefront']])]
 class CallbackController extends StorefrontController

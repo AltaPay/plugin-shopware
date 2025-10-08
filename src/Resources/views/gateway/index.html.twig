@@ -692,7 +692,8 @@
             margin-bottom: 25px;
           }
 
-          .checkout-v2 .surcharge-amount {
+          .checkout-v2 .surcharge-amount,
+          .altapay-back-to-shop {
             display: none;
           }
 
@@ -771,13 +772,15 @@
                     <!--All content in here will be replaced by the actual payment form-->
                 </form>
             {% endblock %}
-            {% if 'checkout.finishButtonBackToShop'|trans != 'checkout.finishButtonBackToShop' %}
-              <a href="{{ path('frontend.checkout.cart.page') }}"
-                 class="btn btn-outline-primary header-minimal-back-to-shop-button"
-                 title="{{ 'checkout.finishButtonBackToShop'|trans|striptags }}">
-                {{ 'checkout.finishButtonBackToShop'|trans|striptags }}
-              </a>
-            {% endif %}
+            {% block altapay_back_to_cart_button %}
+                <div class="col-md-4 altapay-back-to-shop">
+                    <a href="{{ path('frontend.checkout.cart.page') }}"
+                       class="btn btn-outline-primary header-minimal-back-to-shop-button"
+                       title="{{ 'checkout.finishButtonBackToShop'|trans|striptags }}">
+                        {{ 'checkout.finishButtonBackToShop'|trans|striptags }}
+                    </a>
+                </div>
+            {% endblock %}
         </div>
       </div>
     {% endblock %}
