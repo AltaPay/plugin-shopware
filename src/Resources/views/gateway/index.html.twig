@@ -355,7 +355,8 @@
 
           .checkout-style .AltaPaySubmitButton,
           .checkout-style #submitbutton,
-          .checkout-style #cancelPayment {
+          .checkout-style #cancelPayment,
+          .checkout-style input[type="button"]{
             outline: none;
             padding: 15px 16px;
             color: white;
@@ -368,11 +369,13 @@
             font-size: 17px;
           }
 
-          .checkout-style .AltaPaySubmitButton {
+          .checkout-style .AltaPaySubmitButton,
+          .checkout-style input[type="button"] {
             background: #31C37E;
           }
 
-          .checkout-style .AltaPaySubmitButton:hover {
+          .checkout-style .AltaPaySubmitButton:hover,
+          .checkout-style input[type="button"]:hover {
             background: #16b36e;
           }
 
@@ -435,6 +438,7 @@
 
           .checkout-style #iDealPayment table tr td {
             vertical-align: middle;
+            display: block;
           }
 
           .checkout-style #iDealPayment #pensioPaymentIdealSubmitButton {
@@ -498,6 +502,7 @@
           }
 
           .checkout-style .content-wrapper {
+            align-items: center;
             max-width: 680px;
             padding: 0;
             box-sizing: border-box;
@@ -672,15 +677,15 @@
 
           .checkout-style .payment-form-wrapper {
             background-color: white;
-            padding: 20px 40px;
+            padding: 20px 30px;
             border-radius: 15px;
+            width: 100%;
+            max-width: 600px;
           }
 
           .checkout-v2 div.payment-form-wrapper {
             padding: 25px 25px 25px 25px !important;
             display: inline-block;
-            width: 100%;
-            max-width: 600px;
           }
 
           .checkout-v2 .pensio_payment_form_cvc,
@@ -695,6 +700,32 @@
           .checkout-v2 .surcharge-amount,
           .altapay-back-to-shop {
             display: none;
+          }
+
+          input#phoneNumber {
+            margin-bottom: 15px;
+          }
+
+          #Mobile table tr td {
+            display: block;
+          }
+
+          form#Mobile {
+            margin-bottom: 15px;
+          }
+
+          .checkout-style input#MobilePaymentFormSubmit {
+            color: #ffffff;
+          }
+
+          .checkout-style #iDealPayment table,
+          .checkout-style #Mobile table {
+            width: 100%;
+          }
+
+          .checkout-style div#paymentFormWaiting {
+            text-align: center;
+            padding: 10px 0;
           }
 
           @media screen and (max-width: 768px) {
