@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [2.0.5]
+### Added
+- Add option to change the `Checkout Form Style`.
+
 ## [2.0.4]
 ### Added
 - Change Shopware order status to In Progress on successful transaction.

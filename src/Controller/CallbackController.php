@@ -72,6 +72,15 @@ class CallbackController extends StorefrontController
             $salesChannelContext->getContext()
         )->get($mediaId) : null;
 
+        $formTemplate = $request->get('form_template');
+
+        $map = [
+          'form_checkout_div' => 'checkout-style',
+          'form_checkout'     => 'checkout-style checkout-v2',
+        ];
+
+        $formTemplateClass = $map[$formTemplate] ?? '';
+
         $data = [
             'shopName' => $salesChannelContext->getSalesChannel()->getName(),
             'shopOrderId' => $orderNumber,
@@ -86,6 +95,7 @@ class CallbackController extends StorefrontController
             'surchargeLabel' => $this->translator->trans('altapay.gateway.surcharge'),
             'context' => $salesChannelContext,
             'order' => $order,
+            'formTemplateClass' => $formTemplateClass
         ];
 
         return $this->render('@WexoAltaPay/gateway/index.html.twig', ['gatewayData' => $data]);
