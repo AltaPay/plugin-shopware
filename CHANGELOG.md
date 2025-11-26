@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [2.0.6]
+### Added
+- Provide a new configuration option to enable or disable changing the order status to `In Progress` after successful payment.
+- Improve error handling for capture and refund operations, ensuring clear and accurate error messages in all cases.
+
 ## [2.0.5]
 ### Added
 - Add option to change the `Checkout Form Style`.
