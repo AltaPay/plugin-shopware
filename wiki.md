@@ -61,6 +61,8 @@ be provided by AltaPay.
 
     > **Note:** The **AltaPay ShopName** should match the subdomain at the beginning of your AltaPay URL. For example, if your payment URL is `https://demoshop.altapaysecure.com`, then the AltaPay ShopName is `demoshop`.
 
+3. Enable the **Change the order status to In-Progress after a successful payment** setting if you want to update the order status to **In Progress** automatically after a successful payment.
+
 3. Select the payment form logo to be displayed in the header of the payment form.
 
 4. From the Checkout Form Style dropdown, choose the preferred checkout form style.
