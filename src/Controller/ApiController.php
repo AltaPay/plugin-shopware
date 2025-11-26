@@ -50,7 +50,7 @@ class ApiController extends AbstractController
             ->addSorting(new FieldSorting('transactions.createdAt', FieldSorting::DESCENDING));
         $order = $this->orderRepository->search($criteria, $context)->first();
         if (!$order) {
-            return new Response(status: 400);
+            return new JsonApiResponse(['success' => false, 'message' => 'Order not found.'], 400);
         }
 
         $transactionResponse      = $this->paymentService->getTransaction($order, $order->getSalesChannelId());
@@ -58,7 +58,7 @@ class ApiController extends AbstractController
         $altaPayTransaction       = $transactionResponseAsXml->Body?->Transactions?->Transaction;
 
         if (!$altaPayTransaction) {
-          return new Response(status: 400);
+            return new JsonApiResponse(['success' => false, 'message' => 'Transaction does not exist.'], 400);
         }
 
         $orderTotal     = (float)$order->getAmountTotal();
@@ -66,7 +66,7 @@ class ApiController extends AbstractController
 
         $remainingAmount = $orderTotal - $capturedAmount;
         if ($captureAmount > $remainingAmount) {
-          return new Response(status: 400);
+            return new JsonApiResponse(['success' => false, 'message' => 'The capture amount exceeds the remaining amount.'], 400);
         }
 
         /** @var $order OrderEntity */
@@ -101,7 +101,7 @@ class ApiController extends AbstractController
             ->addSorting(new FieldSorting('transactions.createdAt', FieldSorting::DESCENDING));
         $order = $this->orderRepository->search($criteria, $context)->first();
         if (!$order) {
-            return new Response(status: 400);
+            return new JsonApiResponse(['success' => false, 'message' => 'Order not found.'], 400);
         }
 
         $transactionResponse      = $this->paymentService->getTransaction($order, $order->getSalesChannelId());
@@ -109,16 +109,15 @@ class ApiController extends AbstractController
         $altaPayTransaction       = $transactionResponseAsXml->Body?->Transactions?->Transaction;
 
         if (!$altaPayTransaction) {
-          return new Response(status: 400);
+            return new JsonApiResponse(['success' => false, 'message' => 'Transaction does not exist.'], 400);
         }
 
-        $orderTotal     = (float)$order->getAmountTotal();
         $refundedAmount = (float)$altaPayTransaction->RefundedAmount;
         $capturedAmount = (float)$altaPayTransaction->CapturedAmount;
 
         $remainingAmount = $refundedAmount - $capturedAmount;
         if ($remainingAmount == 0) {
-          return new Response(status: 400);
+            return new JsonApiResponse(['success' => false, 'message' => 'The order has already been fully refunded.'], 400);
         }
 
         /** @var $order OrderEntity */
