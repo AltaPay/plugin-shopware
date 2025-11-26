@@ -72,11 +72,8 @@ Shopware.Component.register('sw-order-detail-altapay', {
                 this.transaction = response.Body.Transactions.Transaction;
                 this.$emit('save-edits');
             }).catch(error => {
-                if (error.response && error.response.data) {
-                    this.errorMessage = error.response.data.message || 'Something went wrong.';
-                } else {
-                    this.errorMessage = 'Something went wrong.';
-                }
+                const message = error.response?.data?.message;
+                this.errorMessage = message || 'Something went wrong.';
             }).finally(() => {
                 setTimeout(() => {
                     this.isLoadingCapture = false;
@@ -98,11 +95,8 @@ Shopware.Component.register('sw-order-detail-altapay', {
                 this.transaction = response.Body.Transactions.Transaction;
                 this.$emit('save-edits');
             }).catch(error => {
-                if (error.response && error.response.data) {
-                    this.errorMessage = error.response.data.message || 'Something went wrong.';
-                } else {
-                    this.errorMessage = 'Something went wrong.';
-                }
+                const message = error.response?.data?.message;
+                this.errorMessage = message || 'Something went wrong.';
             }).finally(() => {
                 setTimeout(() => {
                     this.isLoadingRefund = false;
