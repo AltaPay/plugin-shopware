@@ -46,7 +46,14 @@
             <label>AltaPay Password</label>
         </input-field>
     </card>
-
+    <card>
+        <title>Order Status</title>
+        <input-field type="bool">
+            <name>updateOrderStateAfterPayment</name>
+            <label>Change the order status to In-Progress after a successful payment.</label>
+            <default>false</default>
+        </input-field>
+    </card>
     <card>
       <title>Checkout Settings</title>
       <component name="sw-media-field">
