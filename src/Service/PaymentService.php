@@ -276,9 +276,8 @@ class PaymentService extends AbstractPaymentHandler
                         $salesChannelContext
                     );
                 }
-
+                $updateOrderStateAfterPayment = $this->systemConfigService->getBool('WexoAltaPay.config.updateOrderStateAfterPayment', $salesChannelContext->getSalesChannelId());
                 $stateMachineState = $transaction->getStateMachineState();
-                $currentState = $stateMachineState ? $stateMachineState->getTechnicalName() : null;
                 // Handle case when state machine state is null - force status update
                 if (!$stateMachineState) {
                     // Force the transaction to open state first, then process
@@ -299,17 +298,21 @@ class PaymentService extends AbstractPaymentHandler
                             $transaction->getId(),
                             $salesChannelContext->getContext()
                         );
-                        
-                        // Update order state to "in progress"
-                        $this->updateOrderStateToInProgress($order, $salesChannelContext->getContext());
+
+                        if ($updateOrderStateAfterPayment) {
+                            // Update order state to "in progress"
+                            $this->updateOrderStateToInProgress($order, $salesChannelContext->getContext());
+                        }
                     } elseif ($result->Body->Transactions->Transaction->ReservedAmount > 0) {
                         $this->orderTransactionStateHandler->authorize(
                             $transaction->getId(),
                             $salesChannelContext->getContext()
                         );
-                        
-                        // Update order state to "in progress"
-                        $this->updateOrderStateToInProgress($order, $salesChannelContext->getContext());
+
+                        if ($updateOrderStateAfterPayment) {
+                            // Update order state to "in progress"
+                            $this->updateOrderStateToInProgress($order, $salesChannelContext->getContext());
+                        }
                     }
                     
                     break;
@@ -328,8 +331,10 @@ class PaymentService extends AbstractPaymentHandler
                         $transaction->getId(),
                         $salesChannelContext->getContext()
                     );
-                    // Update order state to "in progress"
-                    $this->updateOrderStateToInProgress($order, $salesChannelContext->getContext());
+                    if ($updateOrderStateAfterPayment) {
+                        // Update order state to "in progress"
+                        $this->updateOrderStateToInProgress($order, $salesChannelContext->getContext());
+                    }
                 } elseif (!$is_notification and $allRequestParams['type'] == 'paymentAndCapture' and $allRequestParams['require_capture'] == 'true') {
                     $captureResponse = $this->captureReservation($order, $salesChannelContext->getSalesChannelId(), (string)$result->Body->Transactions->Transaction->TransactionId);
                     $captureResponseAsXml = new SimpleXMLElement($captureResponse->getBody()->getContents());
@@ -344,8 +349,10 @@ class PaymentService extends AbstractPaymentHandler
                         $transaction->getId(),
                         $salesChannelContext->getContext()
                     );
-                    // Update order state to "in progress"
-                    $this->updateOrderStateToInProgress($order, $salesChannelContext->getContext());
+                    if ($updateOrderStateAfterPayment) {
+                        // Update order state to "in progress"
+                        $this->updateOrderStateToInProgress($order, $salesChannelContext->getContext());
+                    }
                 }
                 break;
             case "Cancel":
