@@ -24,9 +24,10 @@ use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 use Wexo\AltaPay\Service\PaymentService;
+use Twig\Environment;
 
 #[Route(defaults: ['_routeScope' => ['storefront']])]
-class CallbackController extends StorefrontController
+class CallbackController
 {
     public function __construct(
         protected readonly PaymentService $paymentService,
@@ -35,8 +36,16 @@ class CallbackController extends StorefrontController
         protected readonly RouterInterface $router,
         protected readonly TranslatorInterface $translator,
         protected readonly SystemConfigService $systemConfigService,
-        protected readonly EntityRepository $mediaRepository
+        protected readonly EntityRepository $mediaRepository,
+        protected Environment $twig
     ) {
+    }
+
+    protected function renderTemplate(string $template, array $data = []): Response
+    {
+        return new Response(
+            $this->twig->render($template, $data)
+        );
     }
 
     #[Route(
@@ -98,7 +107,10 @@ class CallbackController extends StorefrontController
             'formTemplateClass' => $formTemplateClass
         ];
 
-        return $this->render('@WexoAltaPay/gateway/index.html.twig', ['gatewayData' => $data]);
+        return $this->renderTemplate(
+            '@WexoAltaPay/gateway/index.html.twig',
+            ['gatewayData' => $data]
+        );
     }
 
     #[Route(
@@ -114,7 +126,10 @@ class CallbackController extends StorefrontController
             'title' => $this->translator->trans('altapay.gateway.title'),
         ];
 
-        return $this->render('@WexoAltaPay/gateway/redirect.html.twig', ['gatewayData' => $data]);
+        return $this->renderTemplate(
+            '@WexoAltaPay/gateway/index.html.twig',
+            ['gatewayData' => $data]
+        );
     }
 
     #[Route(

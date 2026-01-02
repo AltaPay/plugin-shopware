@@ -35,14 +35,11 @@
             <argument type="service" id="Wexo\AltaPay\Service\PaymentService" />
             <argument type="service" id="order.repository" />
             <argument type="service" id="logger" />
-            <argument type="service" id="router" />
+            <argument type="service" id="router.default" />
             <argument type="service" id="translator" />
             <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
             <argument type="service" id="media.repository"/>
-            <argument type="service" id="Shopware\Core\System\SalesChannel\Context\SalesChannelContextRestorer"/>
-            <call method="setContainer">
-                <argument type="service" id="service_container"/>
-            </call>
+            <argument type="service" id="twig"/>
         </service>
         <service id="Wexo\AltaPay\Controller\ApiController" public="true">
             <argument type="service" id="Wexo\AltaPay\Service\PaymentService" />
