@@ -127,7 +127,7 @@ class CallbackController
         ];
 
         return $this->renderTemplate(
-            '@WexoAltaPay/gateway/index.html.twig',
+            '@WexoAltaPay/gateway/redirect.html.twig',
             ['gatewayData' => $data]
         );
     }
