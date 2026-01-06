@@ -119,7 +119,7 @@ class CallbackController
         defaults: ['auth_required' => false],
         methods: ['POST']
     )]
-    public function gatewayRedirect(Request $request, SalesChannelContext $salesChannelContext): Response
+    public function gatewayRedirect(Request $request): Response
     {
         $data = [
             'languageCode' => $request->get('language'),
