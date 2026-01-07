@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [2.0.7]
 ### Fixed
-- Fixed a Twig rendering issue in the storefront controller to restore compatibility with Shopware 6.6 and newer.
+- Fixed a Twig rendering issue in the storefront controller to restore compatibility with Shopware 6.6.9.0 and newer.
 
 ## [2.0.6]
 ### Added
