@@ -165,9 +165,6 @@ class CallbackController
     )]
     public function notification(Request $request, SalesChannelContext $salesChannelContext)
     {
-        if (!IpUtils::checkIp($request->getClientIp(), PaymentService::ALTAPAY_IP_ADDRESS_SET)) {
-            return new Response('Invalid request', 400);
-        }
         try {
             $result = new SimpleXMLElement($request->get('xml'));
             $orderNumber = (string)$result?->Body?->Transactions?->Transaction?->ShopOrderId;

@@ -56,7 +56,7 @@ class PaymentService extends AbstractPaymentHandler
     public const ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD = "wexoAltaPayTransactionId";
     public const ALTAPAY_TRANSACTION_PAYMENT_SCHEME_NAME_CUSTOM_FIELD = "wexoAltapayTransactionPaymentSchemeName";
     public const ALTAPAY_TRANSACTION_PAYMENT_NATURE_CUSTOM_FIELD = "wexoAltapayTransactionPaymentNature";
-    public const ALTAPAY_IP_ADDRESS_SET = ["185.206.120.0/24", "2a10:a200::/29"];
+    public const ALTAPAY_ORDER_STATUS = "altaPayOrderStatus";
 
     public function __construct(
         protected readonly SystemConfigService $systemConfigService,
@@ -268,6 +268,12 @@ class PaymentService extends AbstractPaymentHandler
             case "Open":
                 break;
             case "Success":
+                $customFields = $order->getCustomFields() ?? [];
+                $orderStatus = $customFields[self::ALTAPAY_ORDER_STATUS] ?? null;
+
+                if ($orderStatus === 'processed') {
+                    break;
+                }
                 // Delete cart when either customer or AltaPay reaches this page.
                 $cartToken = $order->getCustomFieldsValue(field: WexoAltaPay::ALTAPAY_CART_TOKEN);
                 if (!empty($cartToken)) {
@@ -280,41 +286,47 @@ class PaymentService extends AbstractPaymentHandler
                 $stateMachineState = $transaction->getStateMachineState();
                 // Handle case when state machine state is null - force status update
                 if (!$stateMachineState) {
-                    // Force the transaction to open state first, then process
-                    $this->orderTransactionStateHandler->reopen(
-                        $transaction->getId(),
-                        $salesChannelContext->getContext()
-                    );
-
-                    // Now process to in_progress
-                    $this->orderTransactionStateHandler->process(
-                        $transaction->getId(),
-                        $salesChannelContext->getContext()
-                    );
-
-                    // Handle payment status
-                    if ($result->Body->Transactions->Transaction->CapturedAmount > 0) {
-                        $this->orderTransactionStateHandler->paid(
+                    try {
+                        // Force the transaction to open state first, then process
+                        $this->orderTransactionStateHandler->reopen(
                             $transaction->getId(),
                             $salesChannelContext->getContext()
                         );
 
-                        if ($updateOrderStateAfterPayment) {
-                            // Update order state to "in progress"
-                            $this->updateOrderStateToInProgress($order, $salesChannelContext->getContext());
-                        }
-                    } elseif ($result->Body->Transactions->Transaction->ReservedAmount > 0) {
-                        $this->orderTransactionStateHandler->authorize(
+                        // Now process to in_progress
+                        $this->orderTransactionStateHandler->process(
                             $transaction->getId(),
                             $salesChannelContext->getContext()
                         );
 
-                        if ($updateOrderStateAfterPayment) {
-                            // Update order state to "in progress"
-                            $this->updateOrderStateToInProgress($order, $salesChannelContext->getContext());
+                        // Handle payment status
+                        if ($result->Body->Transactions->Transaction->CapturedAmount > 0) {
+                            $this->orderTransactionStateHandler->paid(
+                                $transaction->getId(),
+                                $salesChannelContext->getContext()
+                            );
+
+                            if ($updateOrderStateAfterPayment) {
+                                // Update order state to "in progress"
+                                $this->updateOrderStateToInProgress($order, $salesChannelContext->getContext());
+                            }
+                        } elseif ($result->Body->Transactions->Transaction->ReservedAmount > 0) {
+                            $this->orderTransactionStateHandler->authorize(
+                                $transaction->getId(),
+                                $salesChannelContext->getContext()
+                            );
+
+                            if ($updateOrderStateAfterPayment) {
+                                // Update order state to "in progress"
+                                $this->updateOrderStateToInProgress($order, $salesChannelContext->getContext());
+                            }
                         }
+                        $order->changeCustomFields([
+                            self::ALTAPAY_ORDER_STATUS => 'processed'
+                        ]);
+                    } catch (\Exception $e) {
+                        $this->logger->error("order transaction state error:". $e->getMessage());
                     }
-                    
                     break;
                 }
                 
