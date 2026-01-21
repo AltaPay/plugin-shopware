@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 ## [2.0.8]
 ### Fixed
 -  Payment status was shown as Failed even though the order was placed successfully.
+-  Removed IP address restriction in the plugin to prevent callback rejections when the shop is running behind Cloudflare proxy IP's.
 
 ## [2.0.7]
 ### Fixed
