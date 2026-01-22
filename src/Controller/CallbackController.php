@@ -165,7 +165,11 @@ class CallbackController
     )]
     public function notification(Request $request, SalesChannelContext $salesChannelContext)
     {
-        if (!IpUtils::checkIp($request->getClientIp(), PaymentService::ALTAPAY_IP_ADDRESS_SET)) {
+        $enableKnownIpProtection = $this->systemConfigService->getBool(
+            'WexoAltaPay.config.enableKnownIpProtection',
+            $salesChannelContext->getSalesChannelId()
+        );
+        if ($enableKnownIpProtection && !IpUtils::checkIp($request->getClientIp(), PaymentService::ALTAPAY_IP_ADDRESS_SET)) {
             return new Response('Invalid callback request', 400);
         }
         try {
