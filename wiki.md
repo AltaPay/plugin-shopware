@@ -63,9 +63,11 @@ be provided by AltaPay.
 
 3. Enable the **Change the order status to In-Progress after a successful payment** setting if you want to update the order status to **In Progress** automatically after a successful payment.
 
-3. Select the payment form logo to be displayed in the header of the payment form.
+4. Enable **Known IP Protection** option to restrict callbacks to known gateway IP addresses. Disable this option if the store is using a firewall or proxy service (such as Cloudflare).
 
-4. From the Checkout Form Style dropdown, choose the preferred checkout form style.
+5. Select the payment form logo to be displayed in the header of the payment form.
+
+6. From the Checkout Form Style dropdown, choose the preferred checkout form style.
 
     `Legacy`
    

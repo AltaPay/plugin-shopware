@@ -55,10 +55,10 @@
         </input-field>
     </card>
     <card>
-        <title>Enable Known IP Protection</title>
+        <title>Known IP Protection</title>
         <input-field type="bool">
             <name>enableKnownIpProtection</name>
-            <label>Enable Known IP Protection.</label>
+            <label>Known IP Protection</label>
             <default>true</default>
             <helpText>
                 Restricts callbacks to known gateway IP addresses.
