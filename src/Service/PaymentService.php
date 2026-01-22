@@ -56,7 +56,7 @@ class PaymentService extends AbstractPaymentHandler
     public const ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD = "wexoAltaPayTransactionId";
     public const ALTAPAY_TRANSACTION_PAYMENT_SCHEME_NAME_CUSTOM_FIELD = "wexoAltapayTransactionPaymentSchemeName";
     public const ALTAPAY_TRANSACTION_PAYMENT_NATURE_CUSTOM_FIELD = "wexoAltapayTransactionPaymentNature";
-    public const ALTAPAY_IP_ADDRESS_SET = ["185.206.120.0/24", "2a10:a200::/29", '185.203.232.129', '185.203.233.129'];
+    public const ALTAPAY_IP_ADDRESS_SET = ["185.206.120.0/24", "2a10:a200::/29", '185.203.232.129', '185.203.233.129']; //NOSONAR
     public const ALTAPAY_ORDER_STATUS = "altaPayOrderStatus";
 
     public function __construct(
