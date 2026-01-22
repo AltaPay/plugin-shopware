@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [2.0.8]
+### Fixed
+-  Payment status was shown as Failed even though the order was placed successfully.
+-  Add a new configuration option to enable or disable Known IP Protection for callbacks.
 
 ## [2.0.7]
 ### Fixed

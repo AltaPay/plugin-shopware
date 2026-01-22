@@ -55,6 +55,18 @@
         </input-field>
     </card>
     <card>
+        <title>Known IP Protection</title>
+        <input-field type="bool">
+            <name>enableKnownIpProtection</name>
+            <label>Known IP Protection</label>
+            <default>true</default>
+            <helpText>
+                Restricts callbacks to known gateway IP addresses.
+                Disable this option if the store is using a firewall or proxy service (such as Cloudflare).
+            </helpText>
+        </input-field>
+    </card>
+    <card>
       <title>Checkout Settings</title>
       <component name="sw-media-field">
         <name>paymentGatewayMedia</name>
