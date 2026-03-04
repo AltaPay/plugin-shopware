@@ -153,7 +153,7 @@ class ApiController extends AbstractController
         $responseAsXml = new \SimpleXMLElement($response->getBody()->getContents());
         if ((string)$responseAsXml->Body?->Result === "Success") {
             $this->orderTransactionStateHandler->cancel(
-                $order->getTransactions()?->first()->getId(), // todo get right transaction
+                $order->getTransactions()?->first()->getId(),
                 $context
             );
         }
@@ -168,8 +168,7 @@ class ApiController extends AbstractController
         $criteria->addAssociation('transactions')
             ->addSorting(new FieldSorting('transactions.createdAt', FieldSorting::DESCENDING));
 
-        /** @var ?OrderEntity $order */
-        $order = $this->orderRepository->search($criteria, $context)->first();
-        return $order;
+        /** @var ?OrderEntity */
+        return $this->orderRepository->search($criteria, $context)->first();
     }
 }
