@@ -58,6 +58,7 @@ class PaymentService extends AbstractPaymentHandler
     public const ALTAPAY_TRANSACTION_PAYMENT_NATURE_CUSTOM_FIELD = "wexoAltapayTransactionPaymentNature";
     public const ALTAPAY_IP_ADDRESS_SET = ["185.206.120.0/24", "2a10:a200::/29", '185.203.232.129', '185.203.233.129']; //NOSONAR
     public const ALTAPAY_ORDER_STATUS = "altaPayOrderStatus";
+    public const ALTAPAY_SALES_CHANNEL_TERMINAL_ID = "altapaySalesChannelTerminalId";
 
     public function __construct(
         protected readonly SystemConfigService $systemConfigService,
@@ -179,6 +180,18 @@ class PaymentService extends AbstractPaymentHandler
 
         $paymentMethod = $salesChannelContext->getPaymentMethod();
         $terminal = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_TERMINAL_ID_CUSTOM_FIELD];
+        $salesChannelTerminal = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_SALES_CHANNEL_TERMINAL_ID];
+
+        if (!empty($salesChannelTerminal)) {
+            $field = 'WexoAltaPay.config.' . $salesChannelTerminal;
+            $salesChannelTerminalValue = $this->systemConfigService->get($field, $order->getSalesChannelId());
+
+            if (!empty($salesChannelTerminalValue)) {
+                $terminal = $salesChannelTerminalValue;
+            }
+
+        }
+
         $paymentRequestType = ($paymentMethod->getTranslated()['customFields'][self::ALTAPAY_AUTO_CAPTURE_CUSTOM_FIELD] ?? null) ? 'paymentAndCapture' : 'payment';
         try {
             $altaPayResponse = $this->createPaymentRequest(
