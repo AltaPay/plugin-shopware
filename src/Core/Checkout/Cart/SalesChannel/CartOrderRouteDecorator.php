@@ -52,7 +52,7 @@ class CartOrderRouteDecorator extends AbstractCartOrderRoute
             ->addAssociation('paymentMethod');
 
 
-        /** @var OrderTransactionEntity $orderTransaction */
+        /** @var OrderTransactionEntity|null $orderTransaction */
         $orderTransaction = $this->orderTransactionRepository->search($criteria, $context->getContext())->first();
 
         if ($orderTransaction) {

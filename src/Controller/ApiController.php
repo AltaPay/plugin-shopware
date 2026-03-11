@@ -29,11 +29,11 @@ class ApiController extends AbstractController
     public function getPayments(Request $request): JsonApiResponse|Response
     {
         $orderId = $request->get('orderId');
+        /** @var ?OrderEntity $order */
         $order = $this->orderRepository->search(new Criteria([$orderId]), Context::createDefaultContext())->first();
         if (!$order) {
             return new Response(status: 400);
         }
-        /** @var $order OrderEntity */
         $response = $this->paymentService->getTransaction($order, $order->getSalesChannelId());
         $responseAsXml = new \SimpleXMLElement($response->getBody()->getContents());
         return new JsonApiResponse(json_encode($responseAsXml));
@@ -45,10 +45,7 @@ class ApiController extends AbstractController
         $orderId = $request->get('orderId');
         $captureAmount = $request->get('captureAmount');
         $context = Context::createDefaultContext();
-        $criteria = new Criteria([$orderId]);
-        $criteria->addAssociation('transactions')
-            ->addSorting(new FieldSorting('transactions.createdAt', FieldSorting::DESCENDING));
-        $order = $this->orderRepository->search($criteria, $context)->first();
+        $order = $this->getOrder($orderId, $context);
         if (!$order) {
             return new JsonApiResponse(['success' => false, 'message' => 'Order not found.'], 400);
         }
@@ -69,7 +66,6 @@ class ApiController extends AbstractController
             return new JsonApiResponse(['success' => false, 'message' => 'The capture amount exceeds the remaining amount.'], 400);
         }
 
-        /** @var $order OrderEntity */
         $response = $this->paymentService->captureReservation($order, $order->getSalesChannelId(), null, $captureAmount);
         $responseAsXml = new \SimpleXMLElement($response->getBody()->getContents());
         if ((string)$responseAsXml->Body?->Result === "Success") {
@@ -96,10 +92,7 @@ class ApiController extends AbstractController
         $orderId = $request->get('orderId');
         $refundAmount = $request->get('refundAmount');
         $context = Context::createDefaultContext();
-        $criteria = new Criteria([$orderId]);
-        $criteria->addAssociation('transactions')
-            ->addSorting(new FieldSorting('transactions.createdAt', FieldSorting::DESCENDING));
-        $order = $this->orderRepository->search($criteria, $context)->first();
+        $order = $this->getOrder($orderId, $context);
         if (!$order) {
             return new JsonApiResponse(['success' => false, 'message' => 'Order not found.'], 400);
         }
@@ -120,7 +113,6 @@ class ApiController extends AbstractController
             return new JsonApiResponse(['success' => false, 'message' => 'The order has already been fully refunded.'], 400);
         }
 
-        /** @var $order OrderEntity */
         $response = $this->paymentService->refundCapturedReservation(
             $order->getCustomFields()[PaymentService::ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD],
             $order->getSalesChannelId(),
@@ -149,14 +141,11 @@ class ApiController extends AbstractController
     {
         $orderId = $request->get('orderId');
         $context = Context::createDefaultContext();
-        $criteria = new Criteria([$orderId]);
-        $criteria->addAssociation('transactions')
-            ->addSorting(new FieldSorting('transactions.createdAt', FieldSorting::DESCENDING));
-        $order = $this->orderRepository->search($criteria, $context)->first();
+        $order = $this->getOrder($orderId, $context);
         if (!$order) {
             return new Response(status: 400);
         }
-        /** @var $order OrderEntity */
+
         $response = $this->paymentService->releaseReservation(
             $order->getCustomFields()[PaymentService::ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD],
             $order->getSalesChannelId()
@@ -164,10 +153,22 @@ class ApiController extends AbstractController
         $responseAsXml = new \SimpleXMLElement($response->getBody()->getContents());
         if ((string)$responseAsXml->Body?->Result === "Success") {
             $this->orderTransactionStateHandler->cancel(
-                $order->getTransactions()->first()->getId(), // todo get right transaction
+                $order->getTransactions()?->first()->getId(),
                 $context
             );
         }
         return new JsonApiResponse(json_encode($responseAsXml));
+    }
+    private function getOrder(string $orderId, ?Context $context = null): ?OrderEntity
+    {
+        if ($context === null) {
+            $context = Context::createDefaultContext();
+        }
+        $criteria = new Criteria([$orderId]);
+        $criteria->addAssociation('transactions')
+            ->addSorting(new FieldSorting('transactions.createdAt', FieldSorting::DESCENDING));
+
+        /** @var ?OrderEntity */
+        return $this->orderRepository->search($criteria, $context)->first();
     }
 }

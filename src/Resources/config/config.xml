@@ -92,4 +92,47 @@
         <defaultValue>form_checkout_div</defaultValue>
       </input-field>
     </card>
+    <card>
+        <title>Terminal setup</title>
+        <input-field>
+            <name>terminal1</name>
+            <label>Terminal 1</label>
+        </input-field>
+        <input-field>
+            <name>terminal2</name>
+            <label>Terminal 2</label>
+        </input-field>
+        <input-field>
+            <name>terminal3</name>
+            <label>Terminal 3</label>
+        </input-field>
+        <input-field>
+            <name>terminal4</name>
+            <label>Terminal 4</label>
+        </input-field>
+        <input-field>
+            <name>terminal5</name>
+            <label>Terminal 5</label>
+        </input-field>
+        <input-field>
+            <name>terminal6</name>
+            <label>Terminal 6</label>
+        </input-field>
+        <input-field>
+            <name>terminal7</name>
+            <label>Terminal 7</label>
+        </input-field>
+        <input-field>
+            <name>terminal8</name>
+            <label>Terminal 8</label>
+        </input-field>
+        <input-field>
+            <name>terminal9</name>
+            <label>Terminal 9</label>
+        </input-field>
+        <input-field>
+            <name>terminal10</name>
+            <label>Terminal 10</label>
+        </input-field>
+    </card>
 </config>

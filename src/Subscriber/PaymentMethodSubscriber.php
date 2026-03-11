@@ -4,6 +4,7 @@ namespace Wexo\AltaPay\Subscriber;
 
 use Shopware\Core\Checkout\Payment\Cart\PaymentHandler\DefaultPayment;
 use Shopware\Core\Checkout\Payment\PaymentEvents;
+use Shopware\Core\Checkout\Payment\PaymentMethodCollection;
 use Shopware\Core\Checkout\Payment\PaymentMethodEntity;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
 use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenEvent;
@@ -16,6 +17,9 @@ use Wexo\AltaPay\WexoAltaPay;
 
 class PaymentMethodSubscriber implements EventSubscriberInterface
 {
+    /**
+     * @param EntityRepository<PaymentMethodCollection> $paymentMethodRepository
+     */
     public function __construct(
         protected EntityRepository $paymentMethodRepository,
         protected PluginIdProvider $pluginIdProvider

@@ -186,6 +186,60 @@ class CustomFieldSetupService
             context: $context
         );
 
+        $terminals = [];
+        $languages = ['de-DE', 'en-GB', 'da-DK'];
+
+        // Add default empty option
+        $terminals[] = [
+            'label' => [
+                'de-DE' => 'Wählen Sie ein Terminal aus',
+                'en-GB' => 'Select a terminal',
+                'da-DK' => 'Vælg en terminal',
+            ],
+            'value' => '',
+        ];
+
+        for ($i = 1; $i <= 10; $i++) {
+            $label = [];
+
+            foreach ($languages as $lang) {
+                $label[$lang] = 'terminal ' . $i;
+            }
+
+            $terminals[] = [
+                'label' => $label,
+                'value' => 'terminal' . $i,
+            ];
+        }
+
+        $this->addCustomField(
+            name: PaymentService::ALTAPAY_SALES_CHANNEL_TERMINAL_ID,
+            type: CustomFieldTypes::SELECT,
+            config: [
+                'customFieldPosition' => 4,
+                'componentName' => 'sw-single-select',
+                'customFieldType' => 'select',
+                'label' => [
+                    'de-DE' => 'Sales Channel - AltaPay Terminal-ID',
+                    'en-GB' => 'Sales Channel - AltaPay Terminal ID',
+                    'da-DK' => 'Sales Channel - AltaPay Terminal-ID',
+                ],
+                'placeholder' => [
+                    'de-DE' => 'Wählen Sie ein Terminal aus...',
+                    'en-GB' => 'Select a terminal...',
+                    'da-DK' => 'Vælg en terminal...',
+                ],
+                'helpText' => [
+                    'de-DE' => 'Wählen Sie die Terminal-Konfiguration für den Vertriebskanal aus. Falls leer gelassen, wird die Standard-Terminal-ID aus der Zahlungsmethode verwendet.',
+                    'en-GB' => 'Select the terminal configuration for the sales channel. If left empty, the default terminal ID from the payment method will be used.',
+                    'da-DK' => 'Vælg terminal-konfigurationen for salgskanalen. Hvis den efterlades tom, vil standard terminal-ID fra betalingsmetoden blive brugt.',
+                ],
+                'options' => $terminals,
+            ],
+            customFieldSetId: $fieldSetId,
+            context: $context
+        );
+
     }
 
     private function addCustomField(

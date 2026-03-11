@@ -81,6 +81,7 @@ be provided by AltaPay.
    
     ![Checkout v2](Docs/Configuration/checkout_v2.png)
 
+7. Enter the terminal names from your AltaPay account that you want to use for specific sales channels in the **Terminal Setup** section. Link these terminals from the Payment Method page.
 
 ## Add Payment Methods
 
@@ -107,19 +108,21 @@ be provided by AltaPay.
 8. Once saved, a new section, **Custom fields**, will appear with the options **AltaPay Terminal ID**(where you must enter the terminal name from AltaPay), **Auto Capture**, and **Surcharge**.
     ![shopware_configure_altapay_terminal_detail](Docs/Configuration/shopware_configure_altapay_terminal_detail.png)
 
-9. Click the **Save** button again.
+9. Select a sales channel-specific terminal configuration. If left empty, the default terminal ID (from the field above) will be used.
 
-10. Now click on your desired shop from the **Sales Channels** menu on the left.
+10. Click the **Save** button again.
+
+11. Now click on your desired shop from the **Sales Channels** menu on the left.
  
-11. In the **General** tab, scroll down to the **Payment and shipping** section & search by name for the payment method you just created.
+12. In the **General** tab, scroll down to the **Payment and shipping** section & search by name for the payment method you just created.
 
     ![shopware_show_payment_method_on_checkout.png](Docs/Configuration/shopware_show_payment_method_on_checkout.png)
 
-12. Choose the payment method and click Save button in the top-right corner.
+13. Choose the payment method and click Save button in the top-right corner.
 
     ![shopware_verify_payment_method.png](Docs/Configuration/shopware_verify_payment_method.png)
 
-13. Once the payment methods are configured, you will be ready to process transactions through AltaPay.
+14. Once the payment methods are configured, you will be ready to process transactions through AltaPay.
 
     ![shopware_checkout_page.png](Docs/Configuration/shopware_checkout_page.png)
 
