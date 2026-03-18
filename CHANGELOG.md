@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [2.1.0]
+### Fixed
+-  Fix: Payment not captured when order status is changed to done for digital products.
+
 ## [2.0.9]
 ### Added
 -  Support for sales channel–specific terminals for payment methods.
