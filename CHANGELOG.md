@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 ## [2.1.0]
 ### Fixed
 -  Fix: Payment not captured when order status is changed to done for digital products.
+-  Fix: Payment handler skipped when AltaPay Terminal ID field is empty but Sales Channel dropdown is set.
+-  Fix: PHP warnings from missing custom field values.
 
 ## [2.0.9]
 ### Added
