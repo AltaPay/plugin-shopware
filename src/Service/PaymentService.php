@@ -179,7 +179,7 @@ class PaymentService extends AbstractPaymentHandler
         );
 
         $paymentMethod = $salesChannelContext->getPaymentMethod();
-        $terminal = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_TERMINAL_ID_CUSTOM_FIELD];
+        $terminal = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_TERMINAL_ID_CUSTOM_FIELD] ?? null;
         $salesChannelTerminal = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_SALES_CHANNEL_TERMINAL_ID] ?? null;
 
         if (!empty($salesChannelTerminal)) {

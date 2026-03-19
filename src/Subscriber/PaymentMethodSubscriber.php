@@ -14,6 +14,7 @@ use Shopware\Core\Framework\Plugin\Util\PluginIdProvider;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Wexo\AltaPay\Service\PaymentService;
 use Wexo\AltaPay\WexoAltaPay;
+use Shopware\Core\System\SystemConfig\SystemConfigService;
 
 class PaymentMethodSubscriber implements EventSubscriberInterface
 {
@@ -22,7 +23,8 @@ class PaymentMethodSubscriber implements EventSubscriberInterface
      */
     public function __construct(
         protected EntityRepository $paymentMethodRepository,
-        protected PluginIdProvider $pluginIdProvider
+        protected PluginIdProvider $pluginIdProvider,
+        protected SystemConfigService $systemConfigService
     ) {
     }
 
@@ -52,7 +54,15 @@ class PaymentMethodSubscriber implements EventSubscriberInterface
             $payload = [];
 
             $payload['id'] = $paymentMethod->getId();
-            if ($paymentMethod->getCustomFieldsValue('wexoAltaPayTerminalId')) {
+            $salesChannelTerminal = $paymentMethod->getCustomFieldsValue('altapaySalesChannelTerminalId');
+            $salesChannelTerminalValue = null;
+
+            if (!empty($salesChannelTerminal)) {
+              $field                     = 'WexoAltaPay.config.' . $salesChannelTerminal;
+              $salesChannelTerminalValue = $this->systemConfigService->get($field);
+            }
+
+            if ($paymentMethod->getCustomFieldsValue('wexoAltaPayTerminalId') || $salesChannelTerminalValue) {
                 $payload['handlerIdentifier'] = PaymentService::class;
                 $payload['pluginId'] = $this->pluginIdProvider->getPluginIdByBaseClass(
                     WexoAltaPay::class,

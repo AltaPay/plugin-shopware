@@ -53,6 +53,7 @@
         <service id="Wexo\AltaPay\Subscriber\PaymentMethodSubscriber">
             <argument type="service" id="payment_method.repository" />
             <argument type="service" id="Shopware\Core\Framework\Plugin\Util\PluginIdProvider" />
+            <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService" />
             <tag name="kernel.event_subscriber" />
         </service>
 
