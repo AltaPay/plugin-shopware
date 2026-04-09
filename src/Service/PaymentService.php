@@ -179,8 +179,8 @@ class PaymentService extends AbstractPaymentHandler
         );
 
         $paymentMethod = $salesChannelContext->getPaymentMethod();
-        $terminal = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_TERMINAL_ID_CUSTOM_FIELD];
-        $salesChannelTerminal = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_SALES_CHANNEL_TERMINAL_ID];
+        $terminal = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_TERMINAL_ID_CUSTOM_FIELD] ?? null;
+        $salesChannelTerminal = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_SALES_CHANNEL_TERMINAL_ID] ?? null;
 
         if (!empty($salesChannelTerminal)) {
             $field = 'WexoAltaPay.config.' . $salesChannelTerminal;
@@ -278,16 +278,36 @@ class PaymentService extends AbstractPaymentHandler
         ) {
             $status = "Success";
         }
+        $customFields = $order->getCustomFields() ?? [];
+        $orderStatus  = $customFields[self::ALTAPAY_ORDER_STATUS] ?? null;
+
+        if ($orderStatus === 'processed') {
+            return;
+        }
+
+        if ($status === "Open" || $status === "Success") {
+            $altaPayTransactionId     = (string)$result->Body->Transactions->Transaction->TransactionId;
+            $altaPayPaymentSchemeName = (string)$result->Body->Transactions->Transaction->PaymentSchemeName;
+            $altaPayPaymentNature     = (string)$result->Body->Transactions->Transaction->PaymentNature;
+            $altaPayPaymentId         = (string)$result->Body->Transactions->Transaction->PaymentId;
+
+            $this->orderRepository->update([
+                [
+                    'id' => $order->getId(),
+                    'customFields' => [
+                        self::ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD => $altaPayTransactionId,
+                        self::ALTAPAY_TRANSACTION_PAYMENT_SCHEME_NAME_CUSTOM_FIELD => $altaPayPaymentSchemeName,
+                        self::ALTAPAY_TRANSACTION_PAYMENT_NATURE_CUSTOM_FIELD => $altaPayPaymentNature,
+                        self::ALTAPAY_PAYMENT_ID_CUSTOM_FIELD => $altaPayPaymentId,
+                        self::ALTAPAY_ORDER_STATUS => 'processed'
+                    ],
+                ]
+            ], $salesChannelContext->getContext());
+        }
         switch ($status) {
             case "Open":
                 break;
             case "Success":
-                $customFields = $order->getCustomFields() ?? [];
-                $orderStatus = $customFields[self::ALTAPAY_ORDER_STATUS] ?? null;
-
-                if ($orderStatus === 'processed') {
-                    break;
-                }
                 // Delete cart when either customer or AltaPay reaches this page.
                 $cartToken = $order->getCustomFieldsValue(field: WexoAltaPay::ALTAPAY_CART_TOKEN);
                 if (!empty($cartToken)) {
@@ -335,9 +355,6 @@ class PaymentService extends AbstractPaymentHandler
                                 $this->updateOrderStateToInProgress($order, $salesChannelContext->getContext());
                             }
                         }
-                        $order->changeCustomFields([
-                            self::ALTAPAY_ORDER_STATUS => 'processed'
-                        ]);
                     } catch (\Exception $e) {
                         $this->logger->error("order transaction state error:". $e->getMessage());
                     }
@@ -397,17 +414,6 @@ class PaymentService extends AbstractPaymentHandler
                     ?? (string)$result->APIResponse?->Header?->ErrorMessage
                 );
         }
-        $altaPayTransactionId = (string)$result->Body->Transactions->Transaction->TransactionId;
-        $altaPayPaymentSchemeName= (string)$result->Body->Transactions->Transaction->PaymentSchemeName;
-        $altaPayPaymentNature= (string)$result->Body->Transactions->Transaction->PaymentNature;
-        $altaPayPaymentId= (string)$result->Body->Transactions->Transaction->PaymentId;
-
-        $order->changeCustomFields([
-            self::ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD => $altaPayTransactionId,
-            self::ALTAPAY_TRANSACTION_PAYMENT_SCHEME_NAME_CUSTOM_FIELD => $altaPayPaymentSchemeName,
-            self::ALTAPAY_TRANSACTION_PAYMENT_NATURE_CUSTOM_FIELD => $altaPayPaymentNature,
-            self::ALTAPAY_PAYMENT_ID_CUSTOM_FIELD => $altaPayPaymentId
-        ]);
 
         $surchargeAmount = (float)$result->Body->Transactions->Transaction->SurchargeAmount;
         $paymentMethod = $salesChannelContext->getPaymentMethod();
@@ -451,13 +457,6 @@ class PaymentService extends AbstractPaymentHandler
 
         $this->orderRepository->merge($versionId, $systemContext);
         }
-
-        $this->orderRepository->update([
-            [
-                'id' => $order->getId(),
-                'customFields' => $order->getCustomFields()
-            ]
-        ], $salesChannelContext->getContext());
     }
 
     public function getAltaPayClient(string $salesChannelId): Client
