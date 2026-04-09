@@ -54,7 +54,7 @@ class PaymentMethodSubscriber implements EventSubscriberInterface
             $payload = [];
 
             $payload['id'] = $paymentMethod->getId();
-            $salesChannelTerminal = $paymentMethod->getCustomFieldsValue('altapaySalesChannelTerminalId');
+            $salesChannelTerminal = $paymentMethod->getCustomFieldsValue(PaymentService::ALTAPAY_SALES_CHANNEL_TERMINAL_ID);
             $salesChannelTerminalValue = null;
 
             if (!empty($salesChannelTerminal)) {
@@ -62,7 +62,7 @@ class PaymentMethodSubscriber implements EventSubscriberInterface
               $salesChannelTerminalValue = $this->systemConfigService->get($field);
             }
 
-            if ($paymentMethod->getCustomFieldsValue('wexoAltaPayTerminalId') || $salesChannelTerminalValue) {
+            if ($paymentMethod->getCustomFieldsValue(PaymentService::ALTAPAY_TERMINAL_ID_CUSTOM_FIELD) || $salesChannelTerminalValue) {
                 $payload['handlerIdentifier'] = PaymentService::class;
                 $payload['pluginId'] = $this->pluginIdProvider->getPluginIdByBaseClass(
                     WexoAltaPay::class,
