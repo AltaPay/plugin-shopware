@@ -291,21 +291,17 @@ class PaymentService extends AbstractPaymentHandler
             $altaPayPaymentNature     = (string)$result->Body->Transactions->Transaction->PaymentNature;
             $altaPayPaymentId         = (string)$result->Body->Transactions->Transaction->PaymentId;
 
-            $customFields = array_merge(
-            $customFields,
-            [
-                self::ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD => $altaPayTransactionId,
-                self::ALTAPAY_TRANSACTION_PAYMENT_SCHEME_NAME_CUSTOM_FIELD => $altaPayPaymentSchemeName,
-                self::ALTAPAY_TRANSACTION_PAYMENT_NATURE_CUSTOM_FIELD => $altaPayPaymentNature,
-                self::ALTAPAY_PAYMENT_ID_CUSTOM_FIELD => $altaPayPaymentId,
-            ]
-            );
-
             $this->orderRepository->update([
-            [
-                'id' => $order->getId(),
-                'customFields' => $customFields,
-            ]
+                [
+                    'id' => $order->getId(),
+                    'customFields' => [
+                        self::ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD => $altaPayTransactionId,
+                        self::ALTAPAY_TRANSACTION_PAYMENT_SCHEME_NAME_CUSTOM_FIELD => $altaPayPaymentSchemeName,
+                        self::ALTAPAY_TRANSACTION_PAYMENT_NATURE_CUSTOM_FIELD => $altaPayPaymentNature,
+                        self::ALTAPAY_PAYMENT_ID_CUSTOM_FIELD => $altaPayPaymentId,
+                        self::ALTAPAY_ORDER_STATUS => 'processed'
+                    ],
+                ]
             ], $salesChannelContext->getContext());
         }
         switch ($status) {
@@ -358,16 +354,7 @@ class PaymentService extends AbstractPaymentHandler
                                 // Update order state to "in progress"
                                 $this->updateOrderStateToInProgress($order, $salesChannelContext->getContext());
                             }
-                    }
-                    $this->orderRepository->update([
-                        [
-                        'id' => $order->getId(),
-                        'customFields' => array_merge(
-                            $customFields,
-                            [self::ALTAPAY_ORDER_STATUS => 'processed']
-                        ),
-                        ]
-                    ], $salesChannelContext->getContext());
+                        }
                     } catch (\Exception $e) {
                         $this->logger->error("order transaction state error:". $e->getMessage());
                     }
