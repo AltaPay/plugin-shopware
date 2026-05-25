@@ -192,6 +192,42 @@ class PaymentService extends AbstractPaymentHandler
 
         }
 
+        $terminals = $this->getActiveTerminals($salesChannelContext);
+        if (($key = array_search($terminal, $terminals)) !== false) {
+            unset($terminals[$key]);
+        }
+        array_unshift($terminals, $terminal);
+
+        $altapayCartToken = $order->getCustomFieldsValue(WexoAltaPay::ALTAPAY_CART_TOKEN);
+        $localSessionId = 'session-' . $altapayCartToken . '-' . $order->getOrderNumber();
+        $altapaySessionId = null;
+        
+        try {
+            $session = $this->requestStack->getSession();
+            $altapaySessionId = $session->get('altapay_checkout_session_id');
+        } catch (\Exception $e) {
+            $session = null;
+        }
+
+        if ($altapaySessionId !== $localSessionId) {
+            $altapaySessionId = $this->checkoutSession(
+                $localSessionId,
+                $terminals,
+                $order->getSalesChannelId(),
+                $order->getOrderNumber(),
+                $order->getAmountTotal(),
+                $order->getCurrency()->getIsoCode(),
+                $terminal
+            );
+
+        if ($session && $altapaySessionId) {
+                try {
+                    $session->set('altapay_checkout_session_id', $altapaySessionId);
+                } catch (\Exception $e) {
+                }
+            }
+        }
+
         $paymentRequestType = ($paymentMethod->getTranslated()['customFields'][self::ALTAPAY_AUTO_CAPTURE_CUSTOM_FIELD] ?? null) ? 'paymentAndCapture' : 'payment';
         try {
             $altaPayResponse = $this->createPaymentRequest(
@@ -199,7 +235,8 @@ class PaymentService extends AbstractPaymentHandler
                 $transaction->getReturnUrl(),
                 $salesChannelContext,
                 $terminal,
-                $paymentRequestType
+                $paymentRequestType,
+                $altapaySessionId
             );
         } catch (GuzzleException $e) {
             throw PaymentException::asyncProcessInterrupted(
@@ -217,6 +254,91 @@ class PaymentService extends AbstractPaymentHandler
             // In case someone wants to embed a payment window
             'X-Dynamic-JavaScript-Url' => (string)$altaPayResponse->DynamicJavascriptUrl
         ]);
+    }
+    /**
+     * Get active terminals for the current sales channel, with fallback to global terminal if sales channel specific terminal is not set.
+     * 
+     * @param SalesChannelContext $context 
+     *
+     * @return array<int, string>
+     */
+    public function getActiveTerminals(SalesChannelContext $context): array
+    {
+        $criteria = new Criteria();
+        $criteria->addFilter(new EqualsFilter('handlerIdentifier', PaymentService::class));
+        $criteria->addFilter(new EqualsFilter('active', true));
+
+        $paymentMethods = $this->container->get('payment_method.repository')
+            ->search($criteria, $context->getContext())
+            ->getEntities();
+
+        $terminals = [];
+        foreach ($paymentMethods as $paymentMethod) {
+            $terminal = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_TERMINAL_ID_CUSTOM_FIELD] ?? null;
+            $salesChannelTerminal = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_SALES_CHANNEL_TERMINAL_ID] ?? null;
+
+            if (!empty($salesChannelTerminal)) {
+                $field = 'WexoAltaPay.config.' . $salesChannelTerminal;
+                $salesChannelTerminalValue = $this->systemConfigService->get($field, $context->getSalesChannelId());
+
+                if (!empty($salesChannelTerminalValue)) {
+                    $terminal = $salesChannelTerminalValue;
+                }
+            }
+
+            if (!empty($terminal)) {
+                $terminals[] = $terminal;
+            }
+        }
+
+        return array_unique($terminals);
+    }
+
+    /**
+     *  Creates or retrieves an AltaPay checkout session.
+     * 
+     * @throws GuzzleException
+     * @param string $sessionId 
+     * @param array<int, string> $terminals 
+     * @param string $salesChannelId 
+     * @param string $shopOrderId 
+     * @param float $amount
+     * @param string $currency
+     * @param string $terminal
+     *
+     * @return string|null 
+     */
+    public function checkoutSession(
+        string $sessionId,
+        array $terminals,
+        string $salesChannelId,
+        string $shopOrderId,
+        float $amount,
+        string $currency,
+        string $terminal
+    ): ?string {
+        try {
+            $response = $this->getAltaPayClient($salesChannelId)->request('POST', 'checkoutSession', [
+                'form_params' => [
+                    'session_id' => $sessionId,
+                    'terminals' => $terminals,
+                    'shop_orderid' => $shopOrderId,
+                    'amount' => $amount,
+                    'currency' => $currency,
+                    'terminal' => $terminal,
+                ]
+            ]);
+
+            $xml = new SimpleXMLElement($response->getBody()->getContents());
+
+            if ($xml->Body->Session->Id) {
+                return (string)$xml->Body->Session->Id;
+            }
+        } catch (\Exception $e) {
+            $this->loggr->error('AltaPay CheckoutSession error: ' . $e->getMessage());
+        }
+
+        return null;
     }
 
     /**
@@ -506,7 +628,8 @@ class PaymentService extends AbstractPaymentHandler
         string      $returnUrl,
         SalesChannelContext $context,
         string      $terminal,
-        string $paymentRequestType
+        string $paymentRequestType,
+        string $sessionId = null
     ): SimpleXMLElement {
         $orderLines = [];
         foreach ($order->getLineItems() as $lineItem) {
@@ -675,7 +798,12 @@ class PaymentService extends AbstractPaymentHandler
           ]
         ];
 
+        if ($sessionId) {
+            $formParams['session_id'] = $sessionId;
+        }
+
         $checkoutStyle = $this->systemConfigService->get('WexoAltaPay.config.checkoutStyle', $salesChannelId);
+
         if (!empty($checkoutStyle)) {
           $formParams['form_template'] = $checkoutStyle;
         }

@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [2.1.0]
+### Added
+- Add support for MarketPay payment methods.
+
 ## [2.0.10]
 ### Fixed
 -  Fix: Payment not captured when order status is changed to done for digital products.
