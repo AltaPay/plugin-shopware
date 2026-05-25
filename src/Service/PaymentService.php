@@ -201,7 +201,7 @@ class PaymentService extends AbstractPaymentHandler
         $altapayCartToken = $order->getCustomFieldsValue(WexoAltaPay::ALTAPAY_CART_TOKEN);
         $localSessionId = 'session-' . $altapayCartToken . '-' . $order->getOrderNumber();
         $altapaySessionId = null;
-        
+
         try {
             $session = $this->requestStack->getSession();
             $altapaySessionId = $session->get('altapay_checkout_session_id');
@@ -220,10 +220,13 @@ class PaymentService extends AbstractPaymentHandler
                 $terminal
             );
 
-        if ($session && $altapaySessionId) {
+            if ($session && $altapaySessionId) {
                 try {
                     $session->set('altapay_checkout_session_id', $altapaySessionId);
                 } catch (\Exception $e) {
+                    $this->logger->warning('Unable to store AltaPay checkout session id in session', [
+                        'exception' => $e,
+                    ]);
                 }
             }
         }
@@ -257,8 +260,8 @@ class PaymentService extends AbstractPaymentHandler
     }
     /**
      * Get active terminals for the current sales channel, with fallback to global terminal if sales channel specific terminal is not set.
-     * 
-     * @param SalesChannelContext $context 
+     *
+     * @param SalesChannelContext $context
      *
      * @return array<int, string>
      */
@@ -296,17 +299,17 @@ class PaymentService extends AbstractPaymentHandler
 
     /**
      *  Creates or retrieves an AltaPay checkout session.
-     * 
+     *
      * @throws GuzzleException
-     * @param string $sessionId 
-     * @param array<int, string> $terminals 
-     * @param string $salesChannelId 
-     * @param string $shopOrderId 
+     * @param string $sessionId
+     * @param array<int, string> $terminals
+     * @param string $salesChannelId
+     * @param string $shopOrderId
      * @param float $amount
      * @param string $currency
      * @param string $terminal
      *
-     * @return string|null 
+     * @return string|null
      */
     public function checkoutSession(
         string $sessionId,
@@ -482,7 +485,7 @@ class PaymentService extends AbstractPaymentHandler
                     }
                     break;
                 }
-                
+
                 if ($stateMachineState->getTechnicalName() !== OrderTransactionStates::STATE_OPEN) {
                     break;
                 }
