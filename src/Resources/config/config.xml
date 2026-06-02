@@ -28,11 +28,21 @@
         </input-field>
         <input-field>
             <name>shopName</name>
-            <required>true</required>
             <label>AltaPay ShopName</label>
             <helpText>
                 Enter the shop name that appears at the beginning of your AltaPay URL.
                 For example: demoshop (from https://demoshop.altapaysecure.com)
+            </helpText>
+        </input-field>
+        <input-field>
+            <name>gatewayUrl</name>
+            <label>Gateway URL (full URL override)</label>
+            <helpText>
+                Optional. Use this field only if your gateway URL does not match the
+                standard AltaPay pattern. Enter the base URL provided by the gateway.
+                This field is used ONLY when "AltaPay ShopName" is empty.
+                When "AltaPay ShopName" is filled, this field is ignored and the
+                existing behavior is preserved.
             </helpText>
         </input-field>
         <input-field>

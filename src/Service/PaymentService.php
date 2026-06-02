@@ -338,7 +338,11 @@ class PaymentService extends AbstractPaymentHandler
                 return (string)$xml->Body->Session->Id;
             }
         } catch (\Exception $e) {
-            $this->loggr->error('AltaPay CheckoutSession error: ' . $e->getMessage());
+            $this->logger->error('AltaPay CheckoutSession error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'shopOrderId' => $shopOrderId,
+                'sessionId' => $sessionId,
+            ]);
         }
 
         return null;
@@ -586,12 +590,23 @@ class PaymentService extends AbstractPaymentHandler
 
     public function getAltaPayClient(string $salesChannelId): Client
     {
-        $paymentEnvironment = $this->systemConfigService->get('WexoAltaPay.config.paymentEnvironment', $salesChannelId);
-        $shopName = $this->systemConfigService->get('WexoAltaPay.config.shopName', $salesChannelId);
+        $paymentEnvironment = (string) $this->systemConfigService->get('WexoAltaPay.config.paymentEnvironment', $salesChannelId);
+        $shopName = (string) $this->systemConfigService->get('WexoAltaPay.config.shopName', $salesChannelId);
+        $gatewayUrl = (string) $this->systemConfigService->get('WexoAltaPay.config.gatewayUrl', $salesChannelId);
         $username = $this->systemConfigService->get('WexoAltaPay.config.username', $salesChannelId);
         $password = $this->systemConfigService->get('WexoAltaPay.config.password', $salesChannelId);
+
+        // Default behavior (preserved for all existing customers): expand $PLACEHOLDER$ with shopName.
+        // Override behavior (new): if shopName is empty and a Gateway URL is configured, use it.
+        // The merchant/API/ path is appended automatically so the admin only needs to enter the host.
+        if (trim($shopName) === '' && trim($gatewayUrl) !== '') {
+            $baseUri = rtrim(trim($gatewayUrl), '/') . '/merchant/API/';
+        } else {
+            $baseUri = str_replace('$PLACEHOLDER$', $shopName, $paymentEnvironment);
+        }
+
         return new Client([
-            'base_uri' => str_replace('$PLACEHOLDER$', $shopName, $paymentEnvironment),
+            'base_uri' => $baseUri,
             'auth' => [
                 $username,
                 $password
@@ -601,12 +616,15 @@ class PaymentService extends AbstractPaymentHandler
 
     /**
      * Escape hatch that can be overridden for custom line items.
+     *
+     * The $gatewayItemId is a short alphanumeric id (e.g. "i1") generated per request
+     * to satisfy the gateway's ITN field constraints (Alphanumeric+, 1-20 chars).
      */
-    public function getUnknownLineItemFormat(OrderEntity $order, OrderLineItemEntity $lineItem): array
+    public function getUnknownLineItemFormat(OrderEntity $order, OrderLineItemEntity $lineItem, ?string $gatewayItemId = null): array
     {
         return [
             'description' => $lineItem->getLabel(),
-            'itemId' => $lineItem->getId(),
+            'itemId' => $gatewayItemId ?? $lineItem->getId(),
             'quantity' => $lineItem->getQuantity(),
             'unitPrice' => $lineItem->getPrice()?->getUnitPrice() ?? 0.0,
             'taxAmount' => $lineItem->getPrice()?->getCalculatedTaxes()->getAmount() ?? 0.0,
@@ -635,6 +653,7 @@ class PaymentService extends AbstractPaymentHandler
         string $sessionId = null
     ): SimpleXMLElement {
         $orderLines = [];
+        $itemIdCounter = 0;
         foreach ($order->getLineItems() as $lineItem) {
             $unitTaxRate = $lineItem->getPrice()?->getCalculatedTaxes()->getAmount() / $lineItem->getQuantity();
 
@@ -645,6 +664,7 @@ class PaymentService extends AbstractPaymentHandler
             }
 
             $taxAmount = $lineItem->getPrice()?->getCalculatedTaxes()->getAmount() ?? 0.0;
+            $gatewayItemId = 'item-' . (++$itemIdCounter);
 
             $orderLines[] = match ($lineItem->getType()) {
                 LineItem::PRODUCT_LINE_ITEM_TYPE,
@@ -654,7 +674,7 @@ class PaymentService extends AbstractPaymentHandler
                 LineItem::DISCOUNT_LINE_ITEM,
                 LineItem::PROMOTION_LINE_ITEM_TYPE => [
                     'description' => $lineItem->getLabel(),
-                    'itemId' => $lineItem->getId(),
+                    'itemId' => $gatewayItemId,
                     'quantity' => $lineItem->getQuantity(),
                     'unitPrice' => $unitPrice,
                     'taxAmount' => $taxAmount,
@@ -668,7 +688,7 @@ class PaymentService extends AbstractPaymentHandler
                         LineItem::PROMOTION_LINE_ITEM_TYPE => 'handling',
                     }
                 ],
-                default => $this->getUnknownLineItemFormat($order, $lineItem)
+                default => $this->getUnknownLineItemFormat($order, $lineItem, $gatewayItemId)
             };
         }
         foreach ($order->getDeliveries() as $delivery) {
@@ -683,7 +703,7 @@ class PaymentService extends AbstractPaymentHandler
 
             $orderLines[] = [
                 'description' => $delivery->getShippingMethod()?->getDescription() ?? 'Shipping',
-                'itemId' => $delivery->getId(),
+                'itemId' => 'shipping',
                 'quantity' => 1,
                 'unitPrice' => $netUnitPrice,
                 'taxAmount' => $taxAmount,
