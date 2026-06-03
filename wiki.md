@@ -59,7 +59,7 @@ be provided by AltaPay.
 
    ![shopware_setup_altapay_credentials](Docs/Configuration/shopware_setup_altapay_credentials.png)
 
-    > **Note:** The **AltaPay ShopName** should match the subdomain at the beginning of your AltaPay URL. For example, if your payment URL is `https://demoshop.altapaysecure.com`, then the AltaPay ShopName is `demoshop`.
+    > **Note:** We recommend entering the complete URL in the **Gateway URL** field (e.g., `https://testgateway.altapaysecure.com` or `https://onl.preprod.mpg.market-pay.com`). If provided, this will override the ShopName. If you prefer to use the **AltaPay ShopName** field, enter only the subdomain at the beginning of your AltaPay URL (e.g., `demoshop` from `https://demoshop.altapaysecure.com`).
 
 3. Enable the **Change the order status to In-Progress after a successful payment** setting if you want to update the order status to **In Progress** automatically after a successful payment.
 
