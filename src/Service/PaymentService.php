@@ -618,7 +618,6 @@ class PaymentService extends AbstractPaymentHandler
 
     /**
      * Escape hatch that can be overridden for custom line items.
-     *
      */
     public function getUnknownLineItemFormat(OrderEntity $order, OrderLineItemEntity $lineItem, ?string $gatewayItemId = null): array
     {
@@ -827,7 +826,6 @@ class PaymentService extends AbstractPaymentHandler
         }
 
         $checkoutStyle = $this->systemConfigService->get('WexoAltaPay.config.checkoutStyle', $salesChannelId);
-
         if (!empty($checkoutStyle)) {
           $formParams['form_template'] = $checkoutStyle;
         }
