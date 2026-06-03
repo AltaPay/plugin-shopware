@@ -39,6 +39,7 @@ use Shopware\Core\System\SalesChannel\Context\AbstractSalesChannelContextFactory
 use Shopware\Core\System\SalesChannel\Context\SalesChannelContextFactory;
 use Shopware\Core\System\SalesChannel\Context\SalesChannelContextService;
 use Shopware\Core\Checkout\Cart\Order\OrderConverter;
+use Shopware\Core\Framework\Util\Hasher;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Shopware\Core\Checkout\Cart\Order\RecalculationService;
 use Symfony\Contracts\Translation\TranslatorInterface;
@@ -198,20 +199,23 @@ class PaymentService extends AbstractPaymentHandler
         }
         array_unshift($terminals, $terminal);
 
-        $altapayCartToken = $order->getCustomFieldsValue(WexoAltaPay::ALTAPAY_CART_TOKEN);
-        $localSessionId = 'session-' . $altapayCartToken . '-' . $order->getOrderNumber();
+        $sessionKey = 'altapay_checkout_session_id_' . $order->getId();
         $altapaySessionId = null;
 
         try {
             $session = $this->requestStack->getSession();
-            $altapaySessionId = $session->get('altapay_checkout_session_id');
+            $altapaySessionId = $session->get($sessionKey);
         } catch (\Exception $e) {
             $session = null;
         }
-
-        if ($altapaySessionId !== $localSessionId) {
+        if (empty($altapaySessionId)) {
+            $sessionIdentifier = Hasher::hash([
+                'cartToken' => $order->getCustomFieldsValue(WexoAltaPay::ALTAPAY_CART_TOKEN),
+                'orderId' => $order->getId(),
+                'orderNumber' => $order->getOrderNumber()
+            ]);
             $altapaySessionId = $this->checkoutSession(
-                $localSessionId,
+                $sessionIdentifier,
                 $terminals,
                 $order->getSalesChannelId(),
                 $order->getOrderNumber(),
@@ -222,11 +226,9 @@ class PaymentService extends AbstractPaymentHandler
 
             if ($session && $altapaySessionId) {
                 try {
-                    $session->set('altapay_checkout_session_id', $altapaySessionId);
+                    $session->set($sessionKey, $altapaySessionId);
                 } catch (\Exception $e) {
-                    $this->logger->warning('Unable to store AltaPay checkout session id in session', [
-                        'exception' => $e,
-                    ]);
+                    // Optional: Failure to store in session should not interrupt the payment flow.
                 }
             }
         }
@@ -596,10 +598,10 @@ class PaymentService extends AbstractPaymentHandler
         $username = $this->systemConfigService->get('WexoAltaPay.config.username', $salesChannelId);
         $password = $this->systemConfigService->get('WexoAltaPay.config.password', $salesChannelId);
 
-        // Default behavior (preserved for all existing customers): expand $PLACEHOLDER$ with shopName.
-        // Override behavior (new): if shopName is empty and a Gateway URL is configured, use it.
-        // The merchant/API/ path is appended automatically so the admin only needs to enter the host.
-        if (trim($shopName) === '' && trim($gatewayUrl) !== '') {
+        // Default behavior: expand $PLACEHOLDER$ with shopName.
+        // Override behavior: if a Gateway URL is configured, it overrides the shopName.
+        // The merchant/API/ path is appended automatically.
+        if (!empty($gatewayUrl)) {
             $baseUri = rtrim(trim($gatewayUrl), '/') . '/merchant/API/';
         } else {
             $baseUri = str_replace('$PLACEHOLDER$', $shopName, $paymentEnvironment);
