@@ -619,8 +619,6 @@ class PaymentService extends AbstractPaymentHandler
     /**
      * Escape hatch that can be overridden for custom line items.
      *
-     * The $gatewayItemId is a short alphanumeric id (e.g. "i1") generated per request
-     * to satisfy the gateway's ITN field constraints (Alphanumeric+, 1-20 chars).
      */
     public function getUnknownLineItemFormat(OrderEntity $order, OrderLineItemEntity $lineItem, ?string $gatewayItemId = null): array
     {
@@ -693,6 +691,7 @@ class PaymentService extends AbstractPaymentHandler
                 default => $this->getUnknownLineItemFormat($order, $lineItem, $gatewayItemId)
             };
         }
+        $shippingIdCounter = 0;
         foreach ($order->getDeliveries() as $delivery) {
             $netUnitPrice = round($delivery->getShippingCosts()->getUnitPrice()
                 - $delivery->getShippingCosts()->getCalculatedTaxes()->getAmount(), 2);
@@ -705,7 +704,7 @@ class PaymentService extends AbstractPaymentHandler
 
             $orderLines[] = [
                 'description' => $delivery->getShippingMethod()?->getDescription() ?? 'Shipping',
-                'itemId' => 'shipping',
+                'itemId' => 'shipping-' . (++$shippingIdCounter),
                 'quantity' => 1,
                 'unitPrice' => $netUnitPrice,
                 'taxAmount' => $taxAmount,
