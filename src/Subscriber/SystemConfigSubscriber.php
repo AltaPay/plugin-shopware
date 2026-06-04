@@ -30,16 +30,8 @@ class SystemConfigSubscriber implements EventSubscriberInterface
         }
 
         $value = $event->getValue();
+        $trimmed = is_string($value) ? trim($value) : '';
 
-        if ($value === null || $value === '') {
-            return;
-        }
-
-        if (!is_string($value)) {
-            return;
-        }
-
-        $trimmed = trim($value);
         if ($trimmed === '') {
             return;
         }
