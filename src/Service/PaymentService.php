@@ -602,7 +602,14 @@ class PaymentService extends AbstractPaymentHandler
         // Override behavior: if a Gateway URL is configured, it overrides the shopName.
         // The merchant/API/ path is appended automatically.
         if (!empty($gatewayUrl)) {
-            $baseUri = rtrim(trim($gatewayUrl), '/') . '/merchant/API/';
+            $gatewayUrl = trim($gatewayUrl);
+            if (!str_starts_with(strtolower($gatewayUrl), 'https://')) {
+                $this->logger->error('AltaPay gateway URL is not HTTPS. Request would be sent unencrypted.', [
+                    'gatewayUrl' => $gatewayUrl,
+                    'salesChannelId' => $salesChannelId,
+                ]);
+            }
+            $baseUri = rtrim($gatewayUrl, '/') . '/merchant/API/';
         } else {
             $baseUri = str_replace('$PLACEHOLDER$', $shopName, $paymentEnvironment);
         }
