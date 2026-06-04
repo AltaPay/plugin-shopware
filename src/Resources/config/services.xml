@@ -71,10 +71,5 @@
             <tag name="kernel.event_subscriber"/>
         </service>
 
-        <service id="Wexo\AltaPay\Subscriber\SystemConfigSubscriber">
-            <argument type="service" id="logger" />
-            <tag name="kernel.event_subscriber"/>
-        </service>
-
     </services>
 </container>

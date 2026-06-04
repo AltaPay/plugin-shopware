@@ -603,11 +603,10 @@ class PaymentService extends AbstractPaymentHandler
         // The merchant/API/ path is appended automatically.
         if (!empty($gatewayUrl)) {
             $gatewayUrl = trim($gatewayUrl);
-            if (!str_starts_with(strtolower($gatewayUrl), 'https://')) {
-                $this->logger->error('AltaPay gateway URL is not HTTPS. Request would be sent unencrypted.', [
-                    'gatewayUrl' => $gatewayUrl,
-                    'salesChannelId' => $salesChannelId,
-                ]);
+            if (preg_match('#^http://#i', $gatewayUrl)) {
+                $gatewayUrl = 'https://' . substr($gatewayUrl, 7);
+            } elseif (!preg_match('#^https://#i', $gatewayUrl)) {
+                $gatewayUrl = 'https://' . ltrim($gatewayUrl, '/');
             }
             $baseUri = rtrim($gatewayUrl, '/') . '/merchant/API/';
         } else {
