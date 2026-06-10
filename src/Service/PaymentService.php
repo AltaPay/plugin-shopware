@@ -39,6 +39,7 @@ use Shopware\Core\System\SalesChannel\Context\AbstractSalesChannelContextFactory
 use Shopware\Core\System\SalesChannel\Context\SalesChannelContextFactory;
 use Shopware\Core\System\SalesChannel\Context\SalesChannelContextService;
 use Shopware\Core\Checkout\Cart\Order\OrderConverter;
+use Shopware\Core\Framework\Util\Hasher;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Shopware\Core\Checkout\Cart\Order\RecalculationService;
 use Symfony\Contracts\Translation\TranslatorInterface;
@@ -192,6 +193,46 @@ class PaymentService extends AbstractPaymentHandler
 
         }
 
+        $terminals = $this->getActiveTerminals($salesChannelContext);
+        if (($key = array_search($terminal, $terminals)) !== false) {
+            unset($terminals[$key]);
+        }
+        array_unshift($terminals, $terminal);
+
+        $sessionKey = 'altapay_checkout_session_id_' . $order->getId();
+        $altapaySessionId = null;
+
+        try {
+            $session = $this->requestStack->getSession();
+            $altapaySessionId = $session->get($sessionKey);
+        } catch (\Exception $e) {
+            $session = null;
+        }
+        if (empty($altapaySessionId)) {
+            $sessionIdentifier = Hasher::hash([
+                'cartToken' => $order->getCustomFieldsValue(WexoAltaPay::ALTAPAY_CART_TOKEN),
+                'orderId' => $order->getId(),
+                'orderNumber' => $order->getOrderNumber()
+            ]);
+            $altapaySessionId = $this->checkoutSession(
+                $sessionIdentifier,
+                $terminals,
+                $order->getSalesChannelId(),
+                $order->getOrderNumber(),
+                $order->getAmountTotal(),
+                $order->getCurrency()->getIsoCode(),
+                $terminal
+            );
+
+            if ($session && $altapaySessionId) {
+                try {
+                    $session->set($sessionKey, $altapaySessionId);
+                } catch (\Exception $e) {
+                    // Optional: Failure to store in session should not interrupt the payment flow.
+                }
+            }
+        }
+
         $paymentRequestType = ($paymentMethod->getTranslated()['customFields'][self::ALTAPAY_AUTO_CAPTURE_CUSTOM_FIELD] ?? null) ? 'paymentAndCapture' : 'payment';
         try {
             $altaPayResponse = $this->createPaymentRequest(
@@ -199,7 +240,8 @@ class PaymentService extends AbstractPaymentHandler
                 $transaction->getReturnUrl(),
                 $salesChannelContext,
                 $terminal,
-                $paymentRequestType
+                $paymentRequestType,
+                $altapaySessionId
             );
         } catch (GuzzleException $e) {
             throw PaymentException::asyncProcessInterrupted(
@@ -217,6 +259,95 @@ class PaymentService extends AbstractPaymentHandler
             // In case someone wants to embed a payment window
             'X-Dynamic-JavaScript-Url' => (string)$altaPayResponse->DynamicJavascriptUrl
         ]);
+    }
+    /**
+     * Get active terminals for the current sales channel, with fallback to global terminal if sales channel specific terminal is not set.
+     *
+     * @param SalesChannelContext $context
+     *
+     * @return array<int, string>
+     */
+    public function getActiveTerminals(SalesChannelContext $context): array
+    {
+        $criteria = new Criteria();
+        $criteria->addFilter(new EqualsFilter('handlerIdentifier', PaymentService::class));
+        $criteria->addFilter(new EqualsFilter('active', true));
+
+        $paymentMethods = $this->container->get('payment_method.repository')
+            ->search($criteria, $context->getContext())
+            ->getEntities();
+
+        $terminals = [];
+        foreach ($paymentMethods as $paymentMethod) {
+            $terminal = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_TERMINAL_ID_CUSTOM_FIELD] ?? null;
+            $salesChannelTerminal = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_SALES_CHANNEL_TERMINAL_ID] ?? null;
+
+            if (!empty($salesChannelTerminal)) {
+                $field = 'WexoAltaPay.config.' . $salesChannelTerminal;
+                $salesChannelTerminalValue = $this->systemConfigService->get($field, $context->getSalesChannelId());
+
+                if (!empty($salesChannelTerminalValue)) {
+                    $terminal = $salesChannelTerminalValue;
+                }
+            }
+
+            if (!empty($terminal)) {
+                $terminals[] = $terminal;
+            }
+        }
+
+        return array_unique($terminals);
+    }
+
+    /**
+     *  Creates or retrieves an AltaPay checkout session.
+     *
+     * @throws GuzzleException
+     * @param string $sessionId
+     * @param array<int, string> $terminals
+     * @param string $salesChannelId
+     * @param string $shopOrderId
+     * @param float $amount
+     * @param string $currency
+     * @param string $terminal
+     *
+     * @return string|null
+     */
+    public function checkoutSession(
+        string $sessionId,
+        array $terminals,
+        string $salesChannelId,
+        string $shopOrderId,
+        float $amount,
+        string $currency,
+        string $terminal
+    ): ?string {
+        try {
+            $response = $this->getAltaPayClient($salesChannelId)->request('POST', 'checkoutSession', [
+                'form_params' => [
+                    'session_id' => $sessionId,
+                    'terminals' => $terminals,
+                    'shop_orderid' => $shopOrderId,
+                    'amount' => $amount,
+                    'currency' => $currency,
+                    'terminal' => $terminal,
+                ]
+            ]);
+
+            $xml = new SimpleXMLElement($response->getBody()->getContents());
+
+            if ($xml->Body->Session->Id) {
+                return (string)$xml->Body->Session->Id;
+            }
+        } catch (\Exception $e) {
+            $this->logger->error('AltaPay CheckoutSession error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'shopOrderId' => $shopOrderId,
+                'sessionId' => $sessionId,
+            ]);
+        }
+
+        return null;
     }
 
     /**
@@ -360,7 +491,7 @@ class PaymentService extends AbstractPaymentHandler
                     }
                     break;
                 }
-                
+
                 if ($stateMachineState->getTechnicalName() !== OrderTransactionStates::STATE_OPEN) {
                     break;
                 }
@@ -461,12 +592,29 @@ class PaymentService extends AbstractPaymentHandler
 
     public function getAltaPayClient(string $salesChannelId): Client
     {
-        $paymentEnvironment = $this->systemConfigService->get('WexoAltaPay.config.paymentEnvironment', $salesChannelId);
-        $shopName = $this->systemConfigService->get('WexoAltaPay.config.shopName', $salesChannelId);
+        $paymentEnvironment = (string) $this->systemConfigService->get('WexoAltaPay.config.paymentEnvironment', $salesChannelId);
+        $shopName = (string) $this->systemConfigService->get('WexoAltaPay.config.shopName', $salesChannelId);
+        $gatewayUrl = (string) $this->systemConfigService->get('WexoAltaPay.config.gatewayUrl', $salesChannelId);
         $username = $this->systemConfigService->get('WexoAltaPay.config.username', $salesChannelId);
         $password = $this->systemConfigService->get('WexoAltaPay.config.password', $salesChannelId);
+
+        // Default behavior: expand $PLACEHOLDER$ with shopName.
+        // Override behavior: if a Gateway URL is configured, it overrides the shopName.
+        // The merchant/API/ path is appended automatically.
+        if (!empty($gatewayUrl)) {
+            $gatewayUrl = trim($gatewayUrl);
+            if (preg_match('#^http://#i', $gatewayUrl)) {
+                $gatewayUrl = 'https://' . substr($gatewayUrl, 7);
+            } elseif (!preg_match('#^https://#i', $gatewayUrl)) {
+                $gatewayUrl = 'https://' . ltrim($gatewayUrl, '/');
+            }
+            $baseUri = rtrim($gatewayUrl, '/') . '/merchant/API/';
+        } else {
+            $baseUri = str_replace('$PLACEHOLDER$', $shopName, $paymentEnvironment);
+        }
+
         return new Client([
-            'base_uri' => str_replace('$PLACEHOLDER$', $shopName, $paymentEnvironment),
+            'base_uri' => $baseUri,
             'auth' => [
                 $username,
                 $password
@@ -477,11 +625,11 @@ class PaymentService extends AbstractPaymentHandler
     /**
      * Escape hatch that can be overridden for custom line items.
      */
-    public function getUnknownLineItemFormat(OrderEntity $order, OrderLineItemEntity $lineItem): array
+    public function getUnknownLineItemFormat(OrderEntity $order, OrderLineItemEntity $lineItem, ?string $gatewayItemId = null): array
     {
         return [
             'description' => $lineItem->getLabel(),
-            'itemId' => $lineItem->getId(),
+            'itemId' => $gatewayItemId ?? $lineItem->getId(),
             'quantity' => $lineItem->getQuantity(),
             'unitPrice' => $lineItem->getPrice()?->getUnitPrice() ?? 0.0,
             'taxAmount' => $lineItem->getPrice()?->getCalculatedTaxes()->getAmount() ?? 0.0,
@@ -506,9 +654,11 @@ class PaymentService extends AbstractPaymentHandler
         string      $returnUrl,
         SalesChannelContext $context,
         string      $terminal,
-        string $paymentRequestType
+        string $paymentRequestType,
+        string $sessionId = null
     ): SimpleXMLElement {
         $orderLines = [];
+        $itemIdCounter = 0;
         foreach ($order->getLineItems() as $lineItem) {
             $unitTaxRate = $lineItem->getPrice()?->getCalculatedTaxes()->getAmount() / $lineItem->getQuantity();
 
@@ -519,6 +669,7 @@ class PaymentService extends AbstractPaymentHandler
             }
 
             $taxAmount = $lineItem->getPrice()?->getCalculatedTaxes()->getAmount() ?? 0.0;
+            $gatewayItemId = 'item-' . (++$itemIdCounter);
 
             $orderLines[] = match ($lineItem->getType()) {
                 LineItem::PRODUCT_LINE_ITEM_TYPE,
@@ -528,7 +679,7 @@ class PaymentService extends AbstractPaymentHandler
                 LineItem::DISCOUNT_LINE_ITEM,
                 LineItem::PROMOTION_LINE_ITEM_TYPE => [
                     'description' => $lineItem->getLabel(),
-                    'itemId' => $lineItem->getId(),
+                    'itemId' => $gatewayItemId,
                     'quantity' => $lineItem->getQuantity(),
                     'unitPrice' => $unitPrice,
                     'taxAmount' => $taxAmount,
@@ -542,9 +693,10 @@ class PaymentService extends AbstractPaymentHandler
                         LineItem::PROMOTION_LINE_ITEM_TYPE => 'handling',
                     }
                 ],
-                default => $this->getUnknownLineItemFormat($order, $lineItem)
+                default => $this->getUnknownLineItemFormat($order, $lineItem, $gatewayItemId)
             };
         }
+        $shippingIdCounter = 0;
         foreach ($order->getDeliveries() as $delivery) {
             $netUnitPrice = round($delivery->getShippingCosts()->getUnitPrice()
                 - $delivery->getShippingCosts()->getCalculatedTaxes()->getAmount(), 2);
@@ -557,7 +709,7 @@ class PaymentService extends AbstractPaymentHandler
 
             $orderLines[] = [
                 'description' => $delivery->getShippingMethod()?->getDescription() ?? 'Shipping',
-                'itemId' => $delivery->getId(),
+                'itemId' => 'shipping-' . (++$shippingIdCounter),
                 'quantity' => 1,
                 'unitPrice' => $netUnitPrice,
                 'taxAmount' => $taxAmount,
@@ -674,6 +826,10 @@ class PaymentService extends AbstractPaymentHandler
             'otherInfo' => WexoAltaPay::getShopName($this->systemConfigService, $salesChannelId),
           ]
         ];
+
+        if ($sessionId) {
+            $formParams['session_id'] = $sessionId;
+        }
 
         $checkoutStyle = $this->systemConfigService->get('WexoAltaPay.config.checkoutStyle', $salesChannelId);
         if (!empty($checkoutStyle)) {
