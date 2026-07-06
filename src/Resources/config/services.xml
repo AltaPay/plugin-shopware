@@ -40,6 +40,7 @@
             <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
             <argument type="service" id="media.repository"/>
             <argument type="service" id="twig"/>
+            <argument type="service" id="request_stack"/>
         </service>
         <service id="Wexo\AltaPay\Controller\ApiController" public="true">
             <argument type="service" id="Wexo\AltaPay\Service\PaymentService" />
@@ -68,6 +69,11 @@
             <argument type="service" id="Wexo\AltaPay\Service\PaymentService"/>
             <argument type="service" id="Shopware\Core\Checkout\Order\Aggregate\OrderTransaction\OrderTransactionStateHandler"/>
             <argument type="service" id="logger" />
+            <tag name="kernel.event_subscriber"/>
+        </service>
+
+        <service id="Wexo\AltaPay\Subscriber\ApplePayAvailabilitySubscriber">
+            <argument type="service" id="request_stack"/>
             <tag name="kernel.event_subscriber"/>
         </service>
 

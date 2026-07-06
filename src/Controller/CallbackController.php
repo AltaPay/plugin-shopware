@@ -3,6 +3,7 @@
 namespace Wexo\AltaPay\Controller;
 
 use Exception;
+use GuzzleHttp\Exception\GuzzleException;
 use Psr\Log\LoggerInterface;
 use Shopware\Core\Checkout\Cart\CartException;
 use Shopware\Core\Checkout\Order\OrderEntity;
@@ -16,8 +17,10 @@ use Shopware\Core\System\SystemConfig\SystemConfigService;
 use Shopware\Storefront\Controller\StorefrontController;
 use SimpleXMLElement;
 use Symfony\Component\HttpFoundation\IpUtils;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
@@ -37,7 +40,8 @@ class CallbackController
         protected readonly TranslatorInterface $translator,
         protected readonly SystemConfigService $systemConfigService,
         protected readonly EntityRepository $mediaRepository,
-        protected Environment $twig
+        protected Environment $twig,
+        protected readonly RequestStack $requestStack
     ) {
     }
 
@@ -194,5 +198,166 @@ class CallbackController
         $allRequestParams = array_merge($request->query->all(), $request->request->all());
         $this->paymentService->transactionCallback($result, $order, $transaction, $salesChannelContext, $allRequestParams, true);
         return new Response("Acknowledged", 200);
+    }
+
+    /**
+     * Validate an Apple Pay merchant session using only the payment method ID.
+     */
+    #[Route(
+        path: '/altapay/applepay/validate-merchant-by-method',
+        name: 'altapay.applepay.validate_merchant_by_method',
+        defaults: ['auth_required' => false, 'csrf_protected' => false],
+        methods: ['POST']
+    )]
+    public function validateMerchantByMethod(Request $request, SalesChannelContext $salesChannelContext): Response
+    {
+        $validationUrl   = $request->get('validationUrl');
+        $paymentMethodId = $request->get('paymentMethodId');
+
+        if (!$validationUrl || !$paymentMethodId) {
+            return new JsonResponse(['success' => false, 'error' => 'Missing required parameters']);
+        }
+
+        try {
+            $config = $this->paymentService->getApplePayConfigByPaymentMethodId(
+                $paymentMethodId,
+                $salesChannelContext->getContext(),
+                $salesChannelContext->getSalesChannelId()
+            );
+        } catch (\Throwable $e) {
+            $this->logger->error('Apple Pay validate-by-method config error: ' . $e->getMessage(), ['exception' => $e]);
+            return new JsonResponse(['success' => false, 'error' => 'Payment method config not found: ' . $e->getMessage()]);
+        }
+
+        try {
+            $applePaySession = $this->paymentService->cardWalletSession(
+                $validationUrl,
+                $config['terminal'],
+                $request->getHost(),
+                $salesChannelContext->getSalesChannelId()
+            );
+            return new JsonResponse(['success' => true, 'applePaySession' => $applePaySession]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Apple Pay validate-by-method error: ' . $e->getMessage(), ['exception' => $e]);
+            return new JsonResponse(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Serve the dedicated Apple Pay checkout page.
+     */
+    #[Route(
+        path: '/altapay/applepay/checkout',
+        name: 'altapay.applepay.checkout',
+        defaults: ['auth_required' => false],
+        methods: ['GET']
+    )]
+    public function applePayCheckout(Request $request, SalesChannelContext $salesChannelContext): Response
+    {
+        $orderTransactionId = $request->get('orderTransactionId');
+        $returnUrl          = $request->get('returnUrl');
+
+        if (!$orderTransactionId || !$returnUrl) {
+            return new Response('Missing orderTransactionId or returnUrl', 400);
+        }
+
+        try {
+            $config = $this->paymentService->getApplePayConfig($orderTransactionId, $salesChannelContext->getContext());
+        } catch (\Exception $e) {
+            $this->logger->error('Apple Pay checkout config error: ' . $e->getMessage());
+            return new Response('Error loading payment data: ' . $e->getMessage(), 500);
+        }
+
+        $config['returnUrl']   = $returnUrl;
+        $config['sessionUrl']  = $this->router->generate('altapay.applepay.session',   [], UrlGeneratorInterface::ABSOLUTE_URL);
+        $config['authorizeUrl']= $this->router->generate('altapay.applepay.authorize', [], UrlGeneratorInterface::ABSOLUTE_URL);
+
+        return $this->renderTemplate(
+            '@WexoAltaPay/gateway/applepay.html.twig',
+            ['applePayData' => $config]
+        );
+    }
+
+    /**
+     * Validate the Apple Pay merchant session with AltaPay (called by onvalidatemerchant JS event).
+     */
+    #[Route(
+        path: '/altapay/applepay/session',
+        name: 'altapay.applepay.session',
+        defaults: ['auth_required' => false, 'csrf_protected' => false],
+        methods: ['POST']
+    )]
+    public function applePaySession(Request $request, SalesChannelContext $salesChannelContext): Response
+    {
+        $validationUrl      = $request->get('validationUrl');
+        $orderTransactionId = $request->get('orderTransactionId');
+
+        if (!$validationUrl || !$orderTransactionId) {
+            return new JsonResponse(['success' => false, 'error' => 'Missing required parameters'], 400);
+        }
+
+        try {
+            $config = $this->paymentService->getApplePayConfig($orderTransactionId, $salesChannelContext->getContext());
+        } catch (GuzzleException $e) {
+            $this->logger->error('Apple Pay session config error: ' . $e->getMessage());
+            return new JsonResponse(['success' => false, 'error' => 'Failed to load payment config: ' . $e->getMessage()]);
+        }
+
+        try {
+            $applePaySession = $this->paymentService->cardWalletSession(
+                $validationUrl,
+                $config['terminal'],
+                $request->getHost(),
+                $config['salesChannelId']
+            );
+            return new JsonResponse(['success' => true, 'applePaySession' => $applePaySession]);
+        } catch (GuzzleException $e) {
+            $this->logger->error('Apple Pay merchant validation network error: ' . $e->getMessage());
+            return new JsonResponse(['success' => false, 'error' => 'Network error during merchant validation: ' . $e->getMessage()]);
+        } catch (\Exception $e) {
+            $this->logger->error('Apple Pay merchant validation error: ' . $e->getMessage());
+            return new JsonResponse(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Process the Apple Pay payment token received after onpaymentauthorized.
+     */
+    #[Route(
+        path: '/altapay/applepay/authorize',
+        name: 'altapay.applepay.authorize',
+        defaults: ['auth_required' => false, 'csrf_protected' => false],
+        methods: ['POST']
+    )]
+    public function applePayAuthorize(Request $request, SalesChannelContext $salesChannelContext): Response
+    {
+        $content = $request->getContent();
+        $data    = json_decode($content, true);
+
+        $orderTransactionId = $data['orderTransactionId'] ?? null;
+        $providerData       = $data['providerData'] ?? null;
+        $returnUrl          = $data['returnUrl'] ?? null;
+
+        if (!$orderTransactionId || $providerData === null || !$returnUrl) {
+            return new JsonResponse(['success' => false, 'error' => 'Missing required parameters'], 400);
+        }
+
+        $providerDataJson = json_encode($providerData);
+
+        try {
+            $finalReturnUrl = $this->paymentService->processApplePayPayment(
+                $orderTransactionId,
+                $providerDataJson,
+                $returnUrl,
+                $salesChannelContext->getContext()
+            );
+            return new JsonResponse(['success' => true, 'redirectUrl' => $finalReturnUrl]);
+        } catch (GuzzleException $e) {
+            $this->logger->error('Apple Pay authorize network error: ' . $e->getMessage());
+            return new JsonResponse(['success' => false, 'error' => 'Network error during payment processing: ' . $e->getMessage()]);
+        } catch (\Exception $e) {
+            $this->logger->error('Apple Pay authorize error: ' . $e->getMessage());
+            return new JsonResponse(['success' => false, 'error' => 'Payment processing failed: ' . $e->getMessage()]);
+        }
     }
 }

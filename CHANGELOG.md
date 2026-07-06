@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [2.2.0]
+### Added
+- Support Apple Pay functionality
+
 ## [2.1.0]
 ### Added
 - Add support for MarketPay payment methods.

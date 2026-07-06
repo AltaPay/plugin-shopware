@@ -60,6 +60,10 @@ class PaymentService extends AbstractPaymentHandler
     public const ALTAPAY_IP_ADDRESS_SET = ["185.206.120.0/24", "2a10:a200::/29", '185.203.232.129', '185.203.233.129']; //NOSONAR
     public const ALTAPAY_ORDER_STATUS = "altaPayOrderStatus";
     public const ALTAPAY_SALES_CHANNEL_TERMINAL_ID = "altapaySalesChannelTerminalId";
+    public const ALTAPAY_IS_APPLE_PAY_CUSTOM_FIELD = "wexoAltaPayIsApplePay";
+    public const ALTAPAY_APPLE_PAY_NETWORKS_CUSTOM_FIELD = "wexoAltaPayApplePayNetworks";
+    public const ALTAPAY_APPLE_PAY_SESSION_PREFIX = "altapay_apple_pay_checkout_";
+    public const ALTAPAY_APPLE_PAY_RESULT_PREFIX = "altapay_apple_pay_data_";
 
     public function __construct(
         protected readonly SystemConfigService $systemConfigService,
@@ -234,6 +238,20 @@ class PaymentService extends AbstractPaymentHandler
         }
 
         $paymentRequestType = ($paymentMethod->getTranslated()['customFields'][self::ALTAPAY_AUTO_CAPTURE_CUSTOM_FIELD] ?? null) ? 'paymentAndCapture' : 'payment';
+
+        $isApplePay = (bool)($paymentMethod->getTranslated()['customFields'][self::ALTAPAY_IS_APPLE_PAY_CUSTOM_FIELD] ?? false);
+        if ($isApplePay) {
+            $applePayCheckoutUrl = $this->router->generate(
+                'altapay.applepay.checkout',
+                [
+                    'orderTransactionId' => $orderTransactionId,
+                    'returnUrl'          => $transaction->getReturnUrl(),
+                ],
+                UrlGeneratorInterface::ABSOLUTE_URL
+            );
+            return new RedirectResponse($applePayCheckoutUrl);
+        }
+
         try {
             $altaPayResponse = $this->createPaymentRequest(
                 $order,
@@ -376,8 +394,24 @@ class PaymentService extends AbstractPaymentHandler
         );
 
         $allRequestParams = array_merge($request->query->all(), $request->request->all());
+        $xmlString        = $request->get('xml');
+
+        // For Apple Pay payments the XML result is stored in the session
+        if (empty($xmlString)) {
+            $sessionKey = self::ALTAPAY_APPLE_PAY_RESULT_PREFIX . $transaction->getOrderTransactionId();
+            try {
+                $session    = $this->requestStack->getSession();
+                $storedData = $session->get($sessionKey);
+                if ($storedData) {
+                    $xmlString        = $storedData['xml'];
+                    $allRequestParams = array_merge($allRequestParams, $storedData['params'] ?? []);
+                    $session->remove($sessionKey);
+                }
+            } catch (\Exception) {}
+        }
+
         $this->transactionCallback(
-            new SimpleXMLElement($request->get('xml')),
+            new SimpleXMLElement($xmlString),
             $order,
             $orderTransaction,
             $salesChannelContext,
@@ -655,7 +689,8 @@ class PaymentService extends AbstractPaymentHandler
         SalesChannelContext $context,
         string      $terminal,
         string $paymentRequestType,
-        string $sessionId = null
+        string $sessionId = null,
+        string $providerData = null
     ): SimpleXMLElement {
         $orderLines = [];
         $itemIdCounter = 0;
@@ -831,6 +866,10 @@ class PaymentService extends AbstractPaymentHandler
             $formParams['session_id'] = $sessionId;
         }
 
+        if ($providerData !== null) {
+            $formParams['provider_data'] = $providerData;
+        }
+
         $checkoutStyle = $this->systemConfigService->get('WexoAltaPay.config.checkoutStyle', $salesChannelId);
         if (!empty($checkoutStyle)) {
           $formParams['form_template'] = $checkoutStyle;
@@ -843,8 +882,219 @@ class PaymentService extends AbstractPaymentHandler
         return new SimpleXMLElement($response->getBody()->getContents());
     }
 
-    public function getTransaction(OrderEntity $order, string $salesChannelId): ResponseInterface
+    /**
+     * Load Apple Pay config (terminal, label, networks) from a payment method ID directly.
+     *
+     * @throws \RuntimeException
+     */
+    public function getApplePayConfigByPaymentMethodId(
+        string $paymentMethodId,
+        Context $context,
+        string $salesChannelId
+    ): array {
+        $criteria      = new Criteria([$paymentMethodId]);
+        $paymentMethod = $this->container->get('payment_method.repository')
+            ->search($criteria, $context)
+            ->first();
+
+        if (!$paymentMethod) {
+            throw new \RuntimeException('Payment method not found: ' . $paymentMethodId);
+        }
+
+        $customFields = $paymentMethod->getTranslated()['customFields'] ?? [];
+
+        if (empty($customFields[self::ALTAPAY_IS_APPLE_PAY_CUSTOM_FIELD])) {
+            throw new \RuntimeException('Payment method is not an Apple Pay terminal: ' . $paymentMethodId);
+        }
+
+        $terminal             = $customFields[self::ALTAPAY_TERMINAL_ID_CUSTOM_FIELD] ?? null;
+        $salesChannelTerminal = $customFields[self::ALTAPAY_SALES_CHANNEL_TERMINAL_ID] ?? null;
+
+        if (!empty($salesChannelTerminal)) {
+            $field                     = 'WexoAltaPay.config.' . $salesChannelTerminal;
+            $salesChannelTerminalValue = $this->systemConfigService->get($field, $salesChannelId);
+            if (!empty($salesChannelTerminalValue)) {
+                $terminal = $salesChannelTerminalValue;
+            }
+        }
+
+        if (empty($terminal)) {
+            throw new \RuntimeException(
+                'Apple Pay terminal is not configured. Please set the AltaPay Terminal ID on the payment method "'
+                . ($paymentMethod->getName() ?? $paymentMethodId) . '" in the Shopware admin.'
+            );
+        }
+
+        return [
+            'terminal'      => $terminal,
+            'applePayLabel' => (string)($paymentMethod->getTranslated()['name'] ?? $paymentMethod->getName() ?? 'Payment'),
+            'networks'      => array_values(array_filter(array_map('trim',
+                explode(',', $customFields[self::ALTAPAY_APPLE_PAY_NETWORKS_CUSTOM_FIELD] ?? 'visa,masterCard,amex')
+            ))),
+        ];
+    }
+
+    /**
+     * Load all Apple Pay configuration needed for the checkout page, merchant validation,
+     * and payment authorisation. Reads fresh from the DB — no session dependency.
+     *
+     * @throws \RuntimeException
+     */
+    public function getApplePayConfig(string $orderTransactionId, Context $context): array
     {
+        $criteria = new Criteria([$orderTransactionId]);
+        $orderTransaction = $this->orderTransactionRepository->search($criteria, $context)->get($orderTransactionId);
+
+        if (!$orderTransaction) {
+            throw new \RuntimeException('OrderTransaction not found: ' . $orderTransactionId);
+        }
+
+        $orderId  = $orderTransaction->getOrderId();
+        $criteria = new Criteria([$orderId]);
+        $criteria->addAssociation('currency');
+        $criteria->addAssociation('billingAddress.country');
+        $criteria->addAssociation('salesChannel');
+
+        $order = $this->orderRepository->search($criteria, $context)->first();
+        if (!$order) {
+            throw new \RuntimeException('Order not found for transaction: ' . $orderTransactionId);
+        }
+
+        $pmCriteria    = new Criteria([$orderTransaction->getPaymentMethodId()]);
+        $paymentMethod = $this->container->get('payment_method.repository')
+            ->search($pmCriteria, $context)
+            ->first();
+
+        $customFields = ($paymentMethod ? $paymentMethod->getTranslated()['customFields'] : null) ?? [];
+
+        $terminal             = $customFields[self::ALTAPAY_TERMINAL_ID_CUSTOM_FIELD] ?? null;
+        $salesChannelTerminal = $customFields[self::ALTAPAY_SALES_CHANNEL_TERMINAL_ID] ?? null;
+
+        if (!empty($salesChannelTerminal)) {
+            $field                     = 'WexoAltaPay.config.' . $salesChannelTerminal;
+            $salesChannelTerminalValue = $this->systemConfigService->get($field, $order->getSalesChannelId());
+            if (!empty($salesChannelTerminalValue)) {
+                $terminal = $salesChannelTerminalValue;
+            }
+        }
+
+        $applePayLabel      = (string)($paymentMethod ? ($paymentMethod->getTranslated()['name'] ?? $paymentMethod->getName()) : null) ?: $order->getSalesChannel()?->getName() ?: 'Payment';
+        $networksRaw        = (string)($customFields[self::ALTAPAY_APPLE_PAY_NETWORKS_CUSTOM_FIELD] ?? 'visa,masterCard,amex');
+        $networks           = array_values(array_filter(array_map('trim', explode(',', $networksRaw))));
+        $paymentRequestType = ($customFields[self::ALTAPAY_AUTO_CAPTURE_CUSTOM_FIELD] ?? false) ? 'paymentAndCapture' : 'payment';
+
+        return [
+            'orderTransactionId' => $orderTransactionId,
+            'orderId'            => $order->getId(),
+            'terminal'           => $terminal,
+            'paymentRequestType' => $paymentRequestType,
+            'amount'             => (string)round($order->getAmountTotal(), 2),
+            'currency'           => $order->getCurrency()->getIsoCode(),
+            'countryCode'        => $order->getBillingAddress()?->getCountry()?->getIso() ?? 'US',
+            'salesChannelId'     => $order->getSalesChannelId(),
+            'applePayLabel'      => $applePayLabel,
+            'supportedNetworks'  => $networks,
+        ];
+    }
+
+    /**
+     * Validate an Apple Pay merchant session via AltaPay's cardWalletSession API.
+     *
+     * @see https://documentation.altapay.com/Content/Ecom/API/API%20Methods/cardWalletSession.htm
+     * @throws GuzzleException
+     */
+    public function cardWalletSession(
+        string $validationUrl,
+        string $terminal,
+        string $domain,
+        string $salesChannelId
+    ): string {
+        $response = $this->getAltaPayClient($salesChannelId)->request('POST', 'cardWallet/session', [
+            'form_params' => [
+                'terminal'      => $terminal,
+                'validationUrl' => $validationUrl,
+                'domain'        => $domain,
+            ]
+        ]);
+
+        $xml = new SimpleXMLElement($response->getBody()->getContents());
+
+        if ((string)$xml->Body->Result !== 'Success') {
+            throw new \RuntimeException(
+                'Apple Pay merchant validation failed: '
+                . ((string)($xml->Body->MerchantErrorMessage ?? $xml->Header->ErrorMessage ?? 'Unknown error'))
+            );
+        }
+
+        return (string)$xml->Body->ApplePaySession;
+    }
+
+    /**
+     * Process an Apple Pay payment token via AltaPay's createPaymentRequest with provider_data.
+     *
+     * @throws GuzzleException|\RuntimeException
+     * @return string The returnUrl that the browser should navigate to (Shopware's finalize URL).
+     */
+    public function processApplePayPayment(
+        string $orderTransactionId,
+        string $providerData,
+        string $returnUrl,
+        Context $context
+    ): string {
+        $config = $this->getApplePayConfig($orderTransactionId, $context);
+
+        $criteria = new Criteria([$config['orderId']]);
+        $criteria->addAssociation('currency');
+        $order = $this->orderRepository->search($criteria, $context)->first();
+        if (!$order) {
+            throw new \RuntimeException('Order not found.');
+        }
+
+        $amount      = number_format((float)$order->getAmountTotal(), 2, '.', '');
+        $currency    = $order->getCurrency()?->getIsoCode() ?? 'EUR';
+        $shopOrderId = $order->getOrderNumber();
+
+        // --- Call AltaPay cardWallet/authorize ---
+        $response = $this->getAltaPayClient($config['salesChannelId'])->request('POST', 'cardWallet/authorize', [
+            'form_params' => [
+                'provider_data' => $providerData,
+                'terminal'      => $config['terminal'],
+                'shop_orderid'  => $shopOrderId,
+                'amount'        => $amount,
+                'currency'      => $currency,
+            ]
+        ]);
+
+        $altaPayResponse = new SimpleXMLElement($response->getBody()->getContents());
+
+        $result = strtolower((string)($altaPayResponse->Body?->Result ?? ''));
+        if (!in_array($result, ['success', 'open'], true)) {
+            throw new \RuntimeException(
+                'AltaPay Apple Pay payment failed: '
+                . ((string)($altaPayResponse->Body?->MerchantErrorMessage ?? $altaPayResponse->Header?->ErrorMessage ?? 'Unknown error'))
+            );
+        }
+
+        // --- Store XML result in session so finalize() can read it ---
+        $xmlString = $altaPayResponse->asXML();
+        $resultKey = self::ALTAPAY_APPLE_PAY_RESULT_PREFIX . $orderTransactionId;
+        try {
+            $session = $this->requestStack->getSession();
+            $session->set($resultKey, [
+                'xml'    => $xmlString,
+                'params' => [
+                    'type'            => $config['paymentRequestType'] ?? 'payment',
+                    'require_capture' => 'false',
+                ],
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->warning('Apple Pay: could not store payment result in session: ' . $e->getMessage());
+        }
+
+        return $returnUrl;
+    }
+
+    public function getTransaction(OrderEntity $order, string $salesChannelId): ResponseInterface    {
         return $this->getAltaPayClient($salesChannelId)->request('GET', 'payments', [
             'query' => [
                 'transaction_id' => $order->getCustomFields()[self::ALTAPAY_TRANSACTION_ID_CUSTOM_FIELD],

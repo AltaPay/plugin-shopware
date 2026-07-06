@@ -1,0 +1,245 @@
+{% sw_extends '@Storefront/storefront/page/checkout/confirm/index.html.twig' %}
+
+{% block page_checkout_confirm %}
+    {{ parent() }}
+
+    {#
+      Detect Apple Pay methods. customFields may be on pm.customFields (not translated),
+      check that first, fall back to pm.translated.customFields.
+    #}
+    {% set altapayAppleMethods = [] %}
+    {% if page.paymentMethods is defined %}
+        {% for pm in page.paymentMethods %}
+            {% set cf = pm.customFields ?? pm.translated.customFields ?? {} %}
+            {% if cf.wexoAltaPayIsApplePay is defined and cf.wexoAltaPayIsApplePay %}
+                {% set altapayAppleMethods = altapayAppleMethods|merge([{
+                    'id':       pm.id,
+                    'label':    pm.translated.name,
+                    'networks': (cf.wexoAltaPayApplePayNetworks is defined and cf.wexoAltaPayApplePayNetworks)
+                                    ? cf.wexoAltaPayApplePayNetworks
+                                    : 'visa,masterCard,amex'
+                }]) %}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+
+    {% if altapayAppleMethods is not empty %}
+    <script type="text/javascript" src="https://applepay.cdn-apple.com/jsapi/v1/apple-pay-sdk.js"></script>
+    <script>
+    (function () {
+        'use strict';
+
+        var APPLE_PAY_METHODS     = {{ altapayAppleMethods|json_encode|raw }};
+        var VALIDATE_MERCHANT_URL = '{{ path('altapay.applepay.validate_merchant_by_method') }}';
+        var AUTHORIZE_URL         = '{{ path('altapay.applepay.authorize') }}';
+        var CART_TOTAL            = '{{ page.cart.price.totalPrice|number_format(2, '.', '') }}';
+        var CURRENCY_ISO          = {{ context.currency.isoCode|json_encode|raw }};
+        var COUNTRY_CODE          = {{ (context.shippingLocation.country.iso ?? 'DK')|json_encode|raw }};
+
+        /* paymentMethodId → Apple Pay config */
+        var applePayMap = {};
+        APPLE_PAY_METHODS.forEach(function (m) { applePayMap[m.id] = m; });
+
+        if (!window.ApplePaySession) {
+            console.warn('[AltaPay] Apple Pay: not available (use Safari on Apple device).');
+            return;
+        }
+
+        /* Same check as Magento2 AltaPay plugin — exclude Chrome, Android and non-Safari browsers */
+        var isSafari = (/^((?!chrome|android).)*safari/i.test(navigator.userAgent));
+        if (!isSafari) {
+            console.warn('[AltaPay] Apple Pay: hidden — not a Safari browser.');
+            /* Hide the Apple Pay payment method radio options in the payment list */
+            APPLE_PAY_METHODS.forEach(function (m) {
+                var el = document.querySelector('input[name="paymentMethodId"][value="' + m.id + '"]');
+                if (el) {
+                    var row = el.closest('.payment-method') || el.closest('label') || el.parentElement;
+                    if (row) { row.style.display = 'none'; }
+                }
+            });
+            return;
+        }
+
+        try {
+            if (!ApplePaySession.canMakePayments()) {
+                console.warn('[AltaPay] Apple Pay: canMakePayments() = false.');
+                return;
+            }
+        } catch (e) {
+            console.warn('[AltaPay] Apple Pay: canMakePayments() threw:', e);
+            return;
+        }
+
+        /* Run init() exactly once after DOM is ready */
+        var _initialized = false;
+        function runOnce() {
+            if (_initialized) { return; }
+            _initialized = true;
+            init();
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', runOnce);
+        } else {
+            runOnce();
+        }
+
+        function init() {
+            /* Try every known Shopware confirm-form selector */
+            var form = document.getElementById('confirmOrderForm')
+                    || document.querySelector('[data-form-csrf-handler] form')
+                    || document.querySelector('form[action*="checkout/order"]')
+                    || document.querySelector('form[action*="order/confirm"]');
+
+            if (!form) {
+                /* Last resort: find the submit button and walk up to its form */
+                var btn = document.querySelector('[data-form-submit-loader]')
+                       || document.querySelector('button[form="confirmOrderForm"]')
+                       || document.querySelector('.confirm-tos ~ div button[type="submit"]');
+                if (btn) { form = btn.closest('form'); }
+            }
+
+            if (!form) {
+                console.warn('[AltaPay] Apple Pay: form not found. All forms on page:', [].map.call(document.querySelectorAll('form'), function(f){ return f.id + '|' + f.action; }));
+                return;
+            }
+
+            console.log('[AltaPay] Apple Pay ready. Form:', form.id || form.action, 'Methods:', APPLE_PAY_METHODS);
+
+            function getSelectedPaymentMethodId() {
+                var checked = document.querySelector('input[name="paymentMethodId"]:checked')
+                           || document.querySelector('.payment-method-input:checked');
+                return checked ? checked.value : null;
+            }
+
+            /* useCapture:true — run BEFORE Shopware's own submit handlers */
+            form.addEventListener('submit', function (e) {
+                var pmId   = getSelectedPaymentMethodId();
+                var config = pmId ? applePayMap[pmId] : null;
+
+                if (!config) { return; } /* not Apple Pay — let Shopware handle */
+
+                e.preventDefault();
+                e.stopImmediatePropagation();
+
+                console.log('[AltaPay] Intercepted submit for Apple Pay method:', pmId);
+
+                var networks = config.networks.split(',').map(function (n) { return n.trim(); }).filter(Boolean);
+
+                /* session.begin() MUST be synchronous inside the submit handler */
+                var session = new ApplePaySession(3, {
+                    countryCode:          COUNTRY_CODE,
+                    currencyCode:         CURRENCY_ISO,
+                    merchantCapabilities: ['supports3DS'],
+                    supportedNetworks:    networks,
+                    total: { label: config.label, type: 'final', amount: CART_TOTAL }
+                });
+
+                /* Step 1 — Merchant validation */
+                session.onvalidatemerchant = function (event) {
+                    fetch(VALIDATE_MERCHANT_URL, {
+                        method:      'POST',
+                        credentials: 'same-origin',
+                        headers:     { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body:        new URLSearchParams({
+                            validationUrl:   event.validationURL,
+                            paymentMethodId: pmId
+                        }).toString()
+                    })
+                    .then(function (r) {
+                        /* Read as text first — if server returns HTML error page, r.json() would throw */
+                        return r.text().then(function (text) {
+                            try {
+                                return JSON.parse(text);
+                            } catch (e) {
+                                console.error('[AltaPay] validate-merchant non-JSON response (HTTP ' + r.status + '):', text.substring(0, 500));
+                                throw new Error('HTTP ' + r.status + ' — check Shopware server logs for the PHP exception.');
+                            }
+                        });
+                    })
+                    .then(function (data) {
+                        if (data.success) {
+                            /* applePaySession may already be an object or a JSON string */
+                            var merchantSession = (typeof data.applePaySession === 'string')
+                                ? JSON.parse(data.applePaySession)
+                                : data.applePaySession;
+                            session.completeMerchantValidation(merchantSession);
+                        } else {
+                            console.error('[AltaPay] Merchant validation failed:', data.error);
+                            session.abort();
+                        }
+                    })
+                    .catch(function (err) {
+                        console.error('[AltaPay] Merchant validation error:', err.message || err);
+                        session.abort();
+                    });
+                };
+
+                /* Step 2 — Update total */
+                session.onpaymentmethodselected = function () {
+                    session.completePaymentMethodSelection({
+                        newTotal: { label: config.label, type: 'final', amount: CART_TOTAL }
+                    });
+                };
+
+                /* Step 3 — Authenticated: create order then authorize */
+                session.onpaymentauthorized = function (event) {
+                    var appleToken = event.payment.token;
+
+                    fetch(form.action, {
+                        method:      'POST',
+                        credentials: 'same-origin',
+                        redirect:    'follow',
+                        body:        new FormData(form)
+                    })
+                    .then(function (resp) {
+                        var finalUrl           = new URL(resp.url, window.location.origin);
+                        var orderTransactionId = finalUrl.searchParams.get('orderTransactionId');
+                        var returnUrl          = finalUrl.searchParams.get('returnUrl');
+
+                        if (!orderTransactionId || !returnUrl) {
+                            console.error('[AltaPay] Order creation landed on unexpected URL:', resp.url);
+                            throw new Error('Order creation failed — expected Apple Pay redirect params in URL.');
+                        }
+
+                        console.log('[AltaPay] Order created. Transaction:', orderTransactionId);
+
+                        return fetch(AUTHORIZE_URL, {
+                            method:      'POST',
+                            credentials: 'same-origin',
+                            headers:     { 'Content-Type': 'application/json' },
+                            body:        JSON.stringify({
+                                providerData:       appleToken,
+                                orderTransactionId: orderTransactionId,
+                                returnUrl:          returnUrl
+                            })
+                        });
+                    })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.success) {
+                            session.completePayment(ApplePaySession.STATUS_SUCCESS);
+                            window.location.href = data.redirectUrl;
+                        } else {
+                            console.error('[AltaPay] Authorize failed:', data.error);
+                            session.completePayment(ApplePaySession.STATUS_FAILURE);
+                        }
+                    })
+                    .catch(function (err) {
+                        console.error('[AltaPay] Payment error:', err);
+                        session.completePayment(ApplePaySession.STATUS_FAILURE);
+                    });
+                };
+
+                session.onshippingmethodselected  = function () { session.completeShippingMethodSelection({}); };
+                session.onshippingcontactselected = function () { session.completeShippingContactSelection({}); };
+                session.oncancel = function () { console.log('[AltaPay] Apple Pay cancelled.'); };
+
+                session.begin();
+
+            }, true); /* useCapture:true */
+        }
+
+    }());
+    </script>
+    {% endif %}
+{% endblock %}
