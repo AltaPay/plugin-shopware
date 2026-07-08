@@ -106,23 +106,27 @@ be provided by AltaPay.
 7. Click the **Save** button.
 
 8. Once saved, a new section, **Custom fields**, will appear with the options **AltaPay Terminal ID**(where you must enter the terminal name from AltaPay), **Auto Capture**, and **Surcharge**.
+
+9. Enable this option when the payment method is for Apple Pay. This marks the terminal as an Apple Pay payment option.
+
+10. Enter the card networks supported for Apple Pay, separated by commas, for example: amex,visa,mastercard. This defines which card networks are allowed for Apple Pay payments.
     ![shopware_configure_altapay_terminal_detail](Docs/Configuration/shopware_configure_altapay_terminal_detail.png)
 
-9. Select a sales channel-specific terminal configuration. If left empty, the default terminal ID (from the field above) will be used.
+11. Select a sales channel-specific terminal configuration. If left empty, the default terminal ID (from the field above) will be used.
 
-10. Click the **Save** button again.
+12. Click the **Save** button again.
 
-11. Now click on your desired shop from the **Sales Channels** menu on the left.
+13. Now click on your desired shop from the **Sales Channels** menu on the left.
  
-12. In the **General** tab, scroll down to the **Payment and shipping** section & search by name for the payment method you just created.
+14. In the **General** tab, scroll down to the **Payment and shipping** section & search by name for the payment method you just created.
 
     ![shopware_show_payment_method_on_checkout.png](Docs/Configuration/shopware_show_payment_method_on_checkout.png)
 
-13. Choose the payment method and click Save button in the top-right corner.
+15. Choose the payment method and click Save button in the top-right corner.
 
     ![shopware_verify_payment_method.png](Docs/Configuration/shopware_verify_payment_method.png)
 
-14. Once the payment methods are configured, you will be ready to process transactions through AltaPay.
+16. Once the payment methods are configured, you will be ready to process transactions through AltaPay.
 
     ![shopware_checkout_page.png](Docs/Configuration/shopware_checkout_page.png)
 
