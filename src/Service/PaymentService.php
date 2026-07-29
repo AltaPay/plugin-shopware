@@ -981,7 +981,10 @@ class PaymentService extends AbstractPaymentHandler
             }
         }
 
-        $applePayLabel      = (string)($paymentMethod ? ($paymentMethod->getTranslated()['name'] ?? $paymentMethod->getName()) : null) ?: $order->getSalesChannel()?->getName() ?: 'Payment';
+        $paymentMethodName = $paymentMethod
+            ? ($paymentMethod->getTranslated()['name'] ?? $paymentMethod->getName())
+            : null;
+        $applePayLabel     = (string)$paymentMethodName ?: $order->getSalesChannel()?->getName() ?: 'Payment';
         $networksRaw        = (string)($customFields[self::ALTAPAY_APPLE_PAY_NETWORKS_CUSTOM_FIELD] ?? 'visa,masterCard,amex');
         $networks           = array_values(array_filter(array_map('trim', explode(',', $networksRaw))));
         $paymentRequestType = ($customFields[self::ALTAPAY_AUTO_CAPTURE_CUSTOM_FIELD] ?? false) ? 'paymentAndCapture' : 'payment';
