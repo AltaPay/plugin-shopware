@@ -16,6 +16,7 @@ use Psr\Log\LoggerInterface;
 use Shopware\Core\Checkout\Order\OrderEntity;
 use Shopware\Core\Checkout\Payment\PaymentException;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
+use Wexo\AltaPay\Service\Exception\AltaPayException;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
 use Shopware\Core\System\Language\LanguageEntity;
@@ -127,7 +128,7 @@ class PaymentService extends AbstractPaymentHandler
             ->get($orderTransactionId);
 
         if (!$orderTransaction) {
-            throw new \RuntimeException("OrderTransaction not found.");
+            throw new AltaPayException("OrderTransaction not found.");
         }
 
         $orderId = $orderTransaction->getOrderId();
@@ -145,7 +146,7 @@ class PaymentService extends AbstractPaymentHandler
         $order = $this->orderRepository->search($criteria, $context)->first();
 
         if (!$order) {
-            throw new \RuntimeException("Order not found.");
+            throw new AltaPayException("Order not found.");
         }
 
         $billingAddress = $order->getBillingAddress();
@@ -407,7 +408,9 @@ class PaymentService extends AbstractPaymentHandler
                     $allRequestParams = array_merge($allRequestParams, $storedData['params'] ?? []);
                     $session->remove($sessionKey);
                 }
-            } catch (\Exception) {}
+            } catch (\Exception $e) {
+                $this->logger->warning('Apple Pay: failed to restore stored payment result from session: ' . $e->getMessage());
+            }
         }
 
         $this->transactionCallback(
@@ -898,13 +901,13 @@ class PaymentService extends AbstractPaymentHandler
             ->first();
 
         if (!$paymentMethod) {
-            throw new \RuntimeException('Payment method not found: ' . $paymentMethodId);
+            throw new AltaPayException('Payment method not found: ' . $paymentMethodId);
         }
 
         $customFields = $paymentMethod->getTranslated()['customFields'] ?? [];
 
         if (empty($customFields[self::ALTAPAY_IS_APPLE_PAY_CUSTOM_FIELD])) {
-            throw new \RuntimeException('Payment method is not an Apple Pay terminal: ' . $paymentMethodId);
+            throw new AltaPayException('Payment method is not an Apple Pay terminal: ' . $paymentMethodId);
         }
 
         $terminal             = $customFields[self::ALTAPAY_TERMINAL_ID_CUSTOM_FIELD] ?? null;
@@ -919,7 +922,7 @@ class PaymentService extends AbstractPaymentHandler
         }
 
         if (empty($terminal)) {
-            throw new \RuntimeException(
+            throw new AltaPayException(
                 'Apple Pay terminal is not configured. Please set the AltaPay Terminal ID on the payment method "'
                 . ($paymentMethod->getName() ?? $paymentMethodId) . '" in the Shopware admin.'
             );
@@ -946,7 +949,7 @@ class PaymentService extends AbstractPaymentHandler
         $orderTransaction = $this->orderTransactionRepository->search($criteria, $context)->get($orderTransactionId);
 
         if (!$orderTransaction) {
-            throw new \RuntimeException('OrderTransaction not found: ' . $orderTransactionId);
+            throw new AltaPayException('OrderTransaction not found: ' . $orderTransactionId);
         }
 
         $orderId  = $orderTransaction->getOrderId();
@@ -957,7 +960,7 @@ class PaymentService extends AbstractPaymentHandler
 
         $order = $this->orderRepository->search($criteria, $context)->first();
         if (!$order) {
-            throw new \RuntimeException('Order not found for transaction: ' . $orderTransactionId);
+            throw new AltaPayException('Order not found for transaction: ' . $orderTransactionId);
         }
 
         $pmCriteria    = new Criteria([$orderTransaction->getPaymentMethodId()]);
@@ -1020,7 +1023,7 @@ class PaymentService extends AbstractPaymentHandler
         $xml = new SimpleXMLElement($response->getBody()->getContents());
 
         if ((string)$xml->Body->Result !== 'Success') {
-            throw new \RuntimeException(
+            throw new AltaPayException(
                 'Apple Pay merchant validation failed: '
                 . ((string)($xml->Body->MerchantErrorMessage ?? $xml->Header->ErrorMessage ?? 'Unknown error'))
             );
@@ -1047,7 +1050,7 @@ class PaymentService extends AbstractPaymentHandler
         $criteria->addAssociation('currency');
         $order = $this->orderRepository->search($criteria, $context)->first();
         if (!$order) {
-            throw new \RuntimeException('Order not found.');
+            throw new AltaPayException('Order not found.');
         }
 
         $amount      = number_format((float)$order->getAmountTotal(), 2, '.', '');
@@ -1069,7 +1072,7 @@ class PaymentService extends AbstractPaymentHandler
 
         $result = strtolower((string)($altaPayResponse->Body?->Result ?? ''));
         if (!in_array($result, ['success', 'open'], true)) {
-            throw new \RuntimeException(
+            throw new AltaPayException(
                 'AltaPay Apple Pay payment failed: '
                 . ((string)($altaPayResponse->Body?->MerchantErrorMessage ?? $altaPayResponse->Header?->ErrorMessage ?? 'Unknown error'))
             );

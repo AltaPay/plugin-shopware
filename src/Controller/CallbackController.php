@@ -26,6 +26,7 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
+use Wexo\AltaPay\Service\Exception\AltaPayException;
 use Wexo\AltaPay\Service\PaymentService;
 use Twig\Environment;
 
@@ -182,7 +183,7 @@ class CallbackController
             $result = new SimpleXMLElement($request->get('xml'));
             $orderNumber = (string)$result?->Body?->Transactions?->Transaction?->ShopOrderId;
             if (!$orderNumber) {
-                throw new Exception();
+                throw new AltaPayException();
             }
         } catch (Exception) {
             return new Response('Error processing request', 400);
