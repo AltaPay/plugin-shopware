@@ -6,8 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ 'altapay.gateway.title'|trans }}</title>
 
-    {# Apple Pay JS SDK — must load before any ApplePaySession usage #}
-    <script type="text/javascript" src="https://applepay.cdn-apple.com/jsapi/v1/apple-pay-sdk.js"></script>
+    <script type="text/javascript" src="https://applepay.cdn-apple.com/jsapi/v1/apple-pay-sdk.js" crossorigin="anonymous"></script>
 
     <style>
         *,
@@ -153,6 +152,7 @@
     </div>
 
     {% block applepay_script %}
+    {% include '@WexoAltaPay/gateway/apple-pay-session.html.twig' %}
     <script>
     (function () {
         'use strict';
@@ -214,96 +214,53 @@
             errorEl.style.display = 'none';
             button.style.display = 'none';
 
-            var paymentRequest = {
-                countryCode:          cfg.countryCode,
-                currencyCode:         cfg.currencyCode,
-                merchantCapabilities: ['supports3DS'],
-                supportedNetworks:    cfg.supportedNetworks,
-                total: {
-                    label:  cfg.label,
-                    type:   'final',
-                    amount: cfg.amount
-                }
-            };
+            AltaPayApplePay.runSession({
+                countryCode:             cfg.countryCode,
+                currencyCode:            cfg.currencyCode,
+                supportedNetworks:       cfg.supportedNetworks,
+                label:                   cfg.label,
+                amount:                  cfg.amount,
+                validateMerchantUrl:     cfg.sessionUrl,
+                validateMerchantParams:  { orderTransactionId: cfg.orderTransactionId },
 
-            var session = new ApplePaySession(3, paymentRequest);
-
-            session.onvalidatemerchant = function (event) {
-                var body = new URLSearchParams({
-                    validationUrl:      event.validationURL,
-                    orderTransactionId: cfg.orderTransactionId
-                });
-                fetch(cfg.sessionUrl, {
-                    method:      'POST',
-                    headers:     { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    credentials: 'same-origin',
-                    body:        body.toString()
-                })
-                .then(function (res) { return res.json(); })
-                .then(function (data) {
-                    if (data.success) {
-                        session.completeMerchantValidation(JSON.parse(data.applePaySession));
-                    } else {
-                        showError(data.error || 'Merchant validation failed.');
-                        button.style.display = 'block';
-                        session.abort();
-                    }
-                })
-                .catch(function () {
-                    showError('Network error during merchant validation.');
-                    button.style.display = 'block';
-                    session.abort();
-                });
-            };
-
-            session.onpaymentmethodselected = function () {
-                session.completePaymentMethodSelection({
-                    newTotal: { label: cfg.label, type: 'final', amount: cfg.amount }
-                });
-            };
-
-            session.onpaymentauthorized = function (event) {
-                fetch(cfg.authorizeUrl, {
-                    method:      'POST',
-                    headers:     { 'Content-Type': 'application/json' },
-                    credentials: 'same-origin',
-                    body:        JSON.stringify({
-                        providerData:       event.payment.token,
-                        orderTransactionId: cfg.orderTransactionId,
-                        returnUrl:          cfg.returnUrl
+                onPaymentAuthorized: function (event, session) {
+                    fetch(cfg.authorizeUrl, {
+                        method:      'POST',
+                        headers:     { 'Content-Type': 'application/json' },
+                        credentials: 'same-origin',
+                        body:        JSON.stringify({
+                            providerData:       event.payment.token,
+                            orderTransactionId: cfg.orderTransactionId,
+                            returnUrl:          cfg.returnUrl
+                        })
                     })
-                })
-                .then(function (res) { return res.json(); })
-                .then(function (data) {
-                    if (data.success) {
-                        session.completePayment(ApplePaySession.STATUS_SUCCESS);
-                        window.location.href = data.redirectUrl;
-                    } else {
+                    .then(function (res) { return res.json(); })
+                    .then(function (data) {
+                        if (data.success) {
+                            session.completePayment(ApplePaySession.STATUS_SUCCESS);
+                            window.location.href = data.redirectUrl;
+                        } else {
+                            session.completePayment(ApplePaySession.STATUS_FAILURE);
+                            button.style.display = 'block';
+                            showError(data.error || 'Payment failed. Please try again.');
+                        }
+                    })
+                    .catch(function () {
                         session.completePayment(ApplePaySession.STATUS_FAILURE);
                         button.style.display = 'block';
-                        showError(data.error || 'Payment failed. Please try again.');
-                    }
-                })
-                .catch(function () {
-                    session.completePayment(ApplePaySession.STATUS_FAILURE);
+                        showError('Network error during payment processing.');
+                    });
+                },
+
+                onError: function (msg) {
+                    showError(msg);
                     button.style.display = 'block';
-                    showError('Network error during payment processing.');
-                });
-            };
+                },
 
-            session.onshippingmethodselected = function () {
-                session.completeShippingMethodSelection({});
-            };
-
-            session.onshippingcontactselected = function () {
-                session.completeShippingContactSelection({});
-            };
-
-            session.oncancel = function () {
-                button.style.display = 'block';
-            };
-
-            session.begin();
+                onCancel: function () {
+                    button.style.display = 'block';
+                }
+            });
         }
     }());
     </script>

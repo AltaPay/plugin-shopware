@@ -24,7 +24,8 @@
     {% endif %}
 
     {% if altapayAppleMethods is not empty %}
-    <script type="text/javascript" src="https://applepay.cdn-apple.com/jsapi/v1/apple-pay-sdk.js"></script>
+    <script type="text/javascript" src="https://applepay.cdn-apple.com/jsapi/v1/apple-pay-sdk.js" crossorigin="anonymous"></script>
+    {% include '@WexoAltaPay/gateway/apple-pay-session.html.twig' %}
     <script>
     (function () {
         'use strict';
@@ -125,116 +126,74 @@
 
                 var networks = config.networks.split(',').map(function (n) { return n.trim(); }).filter(Boolean);
 
-                /* session.begin() MUST be synchronous inside the submit handler */
-                var session = new ApplePaySession(3, {
-                    countryCode:          COUNTRY_CODE,
-                    currencyCode:         CURRENCY_ISO,
-                    merchantCapabilities: ['supports3DS'],
-                    supportedNetworks:    networks,
-                    total: { label: config.label, type: 'final', amount: CART_TOTAL }
-                });
+                /* AltaPayApplePay.runSession() calls session.begin() synchronously,
+                   which MUST happen inside this submit handler (user-gesture context). */
+                AltaPayApplePay.runSession({
+                    countryCode:            COUNTRY_CODE,
+                    currencyCode:           CURRENCY_ISO,
+                    supportedNetworks:      networks,
+                    label:                  config.label,
+                    amount:                 CART_TOTAL,
+                    validateMerchantUrl:    VALIDATE_MERCHANT_URL,
+                    validateMerchantParams: { paymentMethodId: pmId },
 
-                /* Step 1 — Merchant validation */
-                session.onvalidatemerchant = function (event) {
-                    fetch(VALIDATE_MERCHANT_URL, {
-                        method:      'POST',
-                        credentials: 'same-origin',
-                        headers:     { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body:        new URLSearchParams({
-                            validationUrl:   event.validationURL,
-                            paymentMethodId: pmId
-                        }).toString()
-                    })
-                    .then(function (r) {
-                        /* Read as text first — if server returns HTML error page, r.json() would throw */
-                        return r.text().then(function (text) {
-                            try {
-                                return JSON.parse(text);
-                            } catch (e) {
-                                console.error('[AltaPay] validate-merchant non-JSON response (HTTP ' + r.status + '):', text.substring(0, 500));
-                                throw new Error('HTTP ' + r.status + ' — check Shopware server logs for the PHP exception.');
-                            }
-                        });
-                    })
-                    .then(function (data) {
-                        if (data.success) {
-                            /* applePaySession may already be an object or a JSON string */
-                            var merchantSession = (typeof data.applePaySession === 'string')
-                                ? JSON.parse(data.applePaySession)
-                                : data.applePaySession;
-                            session.completeMerchantValidation(merchantSession);
-                        } else {
-                            console.error('[AltaPay] Merchant validation failed:', data.error);
-                            session.abort();
-                        }
-                    })
-                    .catch(function (err) {
-                        console.error('[AltaPay] Merchant validation error:', err.message || err);
-                        session.abort();
-                    });
-                };
+                    /* Authenticated: create the order, then authorize */
+                    onPaymentAuthorized: function (event, session) {
+                        var appleToken = event.payment.token;
 
-                /* Step 2 — Update total */
-                session.onpaymentmethodselected = function () {
-                    session.completePaymentMethodSelection({
-                        newTotal: { label: config.label, type: 'final', amount: CART_TOTAL }
-                    });
-                };
-
-                /* Step 3 — Authenticated: create order then authorize */
-                session.onpaymentauthorized = function (event) {
-                    var appleToken = event.payment.token;
-
-                    fetch(form.action, {
-                        method:      'POST',
-                        credentials: 'same-origin',
-                        redirect:    'follow',
-                        body:        new FormData(form)
-                    })
-                    .then(function (resp) {
-                        var finalUrl           = new URL(resp.url, window.location.origin);
-                        var orderTransactionId = finalUrl.searchParams.get('orderTransactionId');
-                        var returnUrl          = finalUrl.searchParams.get('returnUrl');
-
-                        if (!orderTransactionId || !returnUrl) {
-                            console.error('[AltaPay] Order creation landed on unexpected URL:', resp.url);
-                            throw new Error('Order creation failed — expected Apple Pay redirect params in URL.');
-                        }
-
-                        console.log('[AltaPay] Order created. Transaction:', orderTransactionId);
-
-                        return fetch(AUTHORIZE_URL, {
+                        fetch(form.action, {
                             method:      'POST',
                             credentials: 'same-origin',
-                            headers:     { 'Content-Type': 'application/json' },
-                            body:        JSON.stringify({
-                                providerData:       appleToken,
-                                orderTransactionId: orderTransactionId,
-                                returnUrl:          returnUrl
-                            })
-                        });
-                    })
-                    .then(function (r) { return r.json(); })
-                    .then(function (data) {
-                        if (data.success) {
-                            session.completePayment(ApplePaySession.STATUS_SUCCESS);
-                            window.location.href = data.redirectUrl;
-                        } else {
-                            console.error('[AltaPay] Authorize failed:', data.error);
+                            redirect:    'follow',
+                            body:        new FormData(form)
+                        })
+                        .then(function (resp) {
+                            var finalUrl           = new URL(resp.url, window.location.origin);
+                            var orderTransactionId = finalUrl.searchParams.get('orderTransactionId');
+                            var returnUrl          = finalUrl.searchParams.get('returnUrl');
+
+                            if (!orderTransactionId || !returnUrl) {
+                                console.error('[AltaPay] Order creation landed on unexpected URL:', resp.url);
+                                throw new Error('Order creation failed — expected Apple Pay redirect params in URL.');
+                            }
+
+                            console.log('[AltaPay] Order created. Transaction:', orderTransactionId);
+
+                            return fetch(AUTHORIZE_URL, {
+                                method:      'POST',
+                                credentials: 'same-origin',
+                                headers:     { 'Content-Type': 'application/json' },
+                                body:        JSON.stringify({
+                                    providerData:       appleToken,
+                                    orderTransactionId: orderTransactionId,
+                                    returnUrl:          returnUrl
+                                })
+                            });
+                        })
+                        .then(function (r) { return r.json(); })
+                        .then(function (data) {
+                            if (data.success) {
+                                session.completePayment(ApplePaySession.STATUS_SUCCESS);
+                                window.location.href = data.redirectUrl;
+                            } else {
+                                console.error('[AltaPay] Authorize failed:', data.error);
+                                session.completePayment(ApplePaySession.STATUS_FAILURE);
+                            }
+                        })
+                        .catch(function (err) {
+                            console.error('[AltaPay] Payment error:', err);
                             session.completePayment(ApplePaySession.STATUS_FAILURE);
-                        }
-                    })
-                    .catch(function (err) {
-                        console.error('[AltaPay] Payment error:', err);
-                        session.completePayment(ApplePaySession.STATUS_FAILURE);
-                    });
-                };
+                        });
+                    },
 
-                session.onshippingmethodselected  = function () { session.completeShippingMethodSelection({}); };
-                session.onshippingcontactselected = function () { session.completeShippingContactSelection({}); };
-                session.oncancel = function () { console.log('[AltaPay] Apple Pay cancelled.'); };
+                    onError: function (msg) {
+                        console.error('[AltaPay] Merchant validation error:', msg);
+                    },
 
-                session.begin();
+                    onCancel: function () {
+                        console.log('[AltaPay] Apple Pay cancelled.');
+                    }
+                });
 
             }, true); /* useCapture:true */
         }
