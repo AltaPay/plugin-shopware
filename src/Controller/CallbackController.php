@@ -32,6 +32,8 @@ use Twig\Environment;
 #[Route(defaults: ['_routeScope' => ['storefront']])]
 class CallbackController
 {
+    private const ERROR_MISSING_PARAMETERS = 'Missing required parameters';
+
     public function __construct(
         protected readonly PaymentService $paymentService,
         protected readonly EntityRepository $orderRepository,
@@ -215,7 +217,7 @@ class CallbackController
         $paymentMethodId = $request->get('paymentMethodId');
 
         if (!$validationUrl || !$paymentMethodId) {
-            return new JsonResponse(['success' => false, 'error' => 'Missing required parameters']);
+            return new JsonResponse(['success' => false, 'error' => self::ERROR_MISSING_PARAMETERS]);
         }
 
         try {
@@ -293,7 +295,7 @@ class CallbackController
         $orderTransactionId = $request->get('orderTransactionId');
 
         if (!$validationUrl || !$orderTransactionId) {
-            return new JsonResponse(['success' => false, 'error' => 'Missing required parameters'], 400);
+            return new JsonResponse(['success' => false, 'error' => self::ERROR_MISSING_PARAMETERS], 400);
         }
 
         try {
@@ -339,7 +341,7 @@ class CallbackController
         $returnUrl          = $data['returnUrl'] ?? null;
 
         if (!$orderTransactionId || $providerData === null || !$returnUrl) {
-            return new JsonResponse(['success' => false, 'error' => 'Missing required parameters'], 400);
+            return new JsonResponse(['success' => false, 'error' => self::ERROR_MISSING_PARAMETERS], 400);
         }
 
         $providerDataJson = json_encode($providerData);
