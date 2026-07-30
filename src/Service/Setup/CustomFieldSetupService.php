@@ -186,32 +186,6 @@ class CustomFieldSetupService
             context: $context
         );
 
-        $terminals = [];
-        $languages = ['de-DE', 'en-GB', 'da-DK'];
-
-        // Add default empty option
-        $terminals[] = [
-            'label' => [
-                'de-DE' => 'Wählen Sie ein Terminal aus',
-                'en-GB' => 'Select a terminal',
-                'da-DK' => 'Vælg en terminal',
-            ],
-            'value' => '',
-        ];
-
-        for ($i = 1; $i <= 10; $i++) {
-            $label = [];
-
-            foreach ($languages as $lang) {
-                $label[$lang] = 'terminal ' . $i;
-            }
-
-            $terminals[] = [
-                'label' => $label,
-                'value' => 'terminal' . $i,
-            ];
-        }
-
         $this->addCustomField(
             name: PaymentService::ALTAPAY_IS_APPLE_PAY_CUSTOM_FIELD,
             type: CustomFieldTypes::SWITCH,
@@ -269,12 +243,46 @@ class CustomFieldSetupService
                     'en-GB' => 'Select the terminal configuration for the sales channel. If left empty, the default terminal ID from the payment method will be used.',
                     'da-DK' => 'Vælg terminal-konfigurationen for salgskanalen. Hvis den efterlades tom, vil standard terminal-ID fra betalingsmetoden blive brugt.',
                 ],
-                'options' => $terminals,
+                'options' => $this->buildTerminalOptions(),
             ],
             customFieldSetId: $fieldSetId,
             context: $context
         );
+    }
 
+    /**
+     * @return array<int, array{label: array<string,string>, value: string}>
+     */
+    private function buildTerminalOptions(): array
+    {
+        $languages = ['de-DE', 'en-GB', 'da-DK'];
+
+        // Add default empty option
+        $terminals = [
+            [
+                'label' => [
+                    'de-DE' => 'Wählen Sie ein Terminal aus',
+                    'en-GB' => 'Select a terminal',
+                    'da-DK' => 'Vælg en terminal',
+                ],
+                'value' => '',
+            ],
+        ];
+
+        for ($i = 1; $i <= 10; $i++) {
+            $label = [];
+
+            foreach ($languages as $lang) {
+                $label[$lang] = 'terminal ' . $i;
+            }
+
+            $terminals[] = [
+                'label' => $label,
+                'value' => 'terminal' . $i,
+            ];
+        }
+
+        return $terminals;
     }
 
     private function addCustomField(
