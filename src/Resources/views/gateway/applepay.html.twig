@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+{% block altapay_applepay_head %}
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ 'altapay.gateway.title'|trans }}</title>
+
+    <script type="text/javascript" src="https://applepay.cdn-apple.com/jsapi/v1/apple-pay-sdk.js" crossorigin="anonymous"></script>
+
+    <style>
+        *,
+        *::before,
+        *::after { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background-color: #f5f5f7;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .applepay-container {
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.10);
+            padding: 40px 32px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .applepay-title {
+            font-size: 22px;
+            font-weight: 600;
+            color: #1d1d1f;
+            margin: 0 0 8px;
+        }
+
+        .applepay-order-info {
+            font-size: 15px;
+            color: #6e6e73;
+            margin: 0 0 28px;
+        }
+
+        .applepay-amount {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1d1d1f;
+            margin: 0 0 32px;
+        }
+
+        #apple-pay-button {
+            -webkit-appearance: -apple-pay-button;
+            -apple-pay-button-type: buy;
+            -apple-pay-button-style: black;
+            display: block;
+            width: 100%;
+            height: 52px;
+            border-radius: 10px;
+            cursor: pointer;
+            border: none;
+            outline: none;
+        }
+
+        /* Fallback for browsers without Apple Pay button support */
+        #apple-pay-button.fallback {
+            background: #000000;
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .applepay-unavailable {
+            display: none;
+            padding: 14px;
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            color: #856404;
+            font-size: 14px;
+        }
+
+        .applepay-error {
+            display: none;
+            margin-top: 16px;
+            padding: 12px;
+            background: #fde8e8;
+            border: 1px solid #f5c6c6;
+            border-radius: 8px;
+            color: #c0392b;
+            font-size: 14px;
+        }
+
+        .applepay-back {
+            display: inline-block;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #6e6e73;
+            text-decoration: none;
+        }
+
+        .applepay-back:hover {
+            color: #1d1d1f;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+{% endblock %}
+
+{% block altapay_applepay_body %}
+<body>
+    <div class="applepay-container">
+        {% block applepay_title %}
+            <h1 class="applepay-title">{{ 'altapay.gateway.title'|trans }}</h1>
+        {% endblock %}
+
+        {% block applepay_order_info %}
+            <p class="applepay-order-info">
+                {{ 'altapay.gateway.orderNumber'|trans }}: <strong>{{ applePayData.orderTransactionId|slice(0,8)|upper }}</strong>
+            </p>
+        {% endblock %}
+
+        {% block applepay_amount %}
+            <p class="applepay-amount">{{ applePayData.currency }} {{ applePayData.amount }}</p>
+        {% endblock %}
+
+        {% block applepay_button %}
+            <div id="apple-pay-wrapper">
+                <button id="apple-pay-button" type="button" aria-label="Buy with Apple Pay"></button>
+                <div id="applepay-unavailable" class="applepay-unavailable">
+                    Apple Pay is not available in this browser. Please use Safari on a supported Apple device.
+                </div>
+            </div>
+        {% endblock %}
+
+        {% block applepay_error %}
+            <div id="applepay-error" class="applepay-error"></div>
+        {% endblock %}
+
+        {% block applepay_back %}
+            <a href="{{ path('frontend.checkout.cart.page') }}" class="applepay-back">
+                ← {{ 'checkout.finishButtonBackToShop'|trans|striptags }}
+            </a>
+        {% endblock %}
+    </div>
+
+    {% block applepay_script %}
+    {% include '@WexoAltaPay/gateway/apple-pay-session.html.twig' %}
+    <script>
+    (function () {
+        'use strict';
+
+        var cfg = {
+            orderTransactionId: {{ applePayData.orderTransactionId|json_encode|raw }},
+            sessionUrl:         {{ applePayData.sessionUrl|json_encode|raw }},
+            authorizeUrl:       {{ applePayData.authorizeUrl|json_encode|raw }},
+            returnUrl:          {{ applePayData.returnUrl|json_encode|raw }},
+            amount:             {{ applePayData.amount|json_encode|raw }},
+            currencyCode:       {{ applePayData.currency|json_encode|raw }},
+            countryCode:        {{ applePayData.countryCode|json_encode|raw }},
+            label:              {{ applePayData.applePayLabel|json_encode|raw }},
+            supportedNetworks:  {{ applePayData.supportedNetworks|json_encode|raw }}
+        };
+
+        var button        = document.getElementById('apple-pay-button');
+        var errorEl       = document.getElementById('applepay-error');
+        var unavailableEl = document.getElementById('applepay-unavailable');
+
+        function showError(msg) {
+            errorEl.textContent = msg || 'Payment failed. Please try again.';
+            errorEl.style.display = 'block';
+        }
+
+        if (!window.ApplePaySession) {
+            button.style.display = 'none';
+            unavailableEl.style.display = 'block';
+            return;
+        }
+
+        try {
+            if (!ApplePaySession.canMakePayments()) {
+                button.style.display = 'none';
+                unavailableEl.style.display = 'block';
+                return;
+            }
+        } catch (e) {
+            button.style.display = 'none';
+            unavailableEl.style.display = 'block';
+            return;
+        }
+
+        // Safari carries the user-gesture context across navigation.
+        // This page was reached by the user submitting the checkout form (user gesture),
+        // so session.begin() is allowed here without an additional click.
+        button.addEventListener('click', function () { startApplePaySession(); });
+
+        // Auto-trigger: begin the sheet immediately on page load.
+        // If the browser rejects it (not a user-gesture context), fall back to the button.
+        try {
+            startApplePaySession();
+        } catch (e) {
+            // Not in a user-gesture context (e.g. direct URL access) — show the button.
+            button.style.display = 'block';
+        }
+
+        function startApplePaySession() {
+            errorEl.style.display = 'none';
+            button.style.display = 'none';
+
+            AltaPayApplePay.runSession({
+                countryCode:             cfg.countryCode,
+                currencyCode:            cfg.currencyCode,
+                supportedNetworks:       cfg.supportedNetworks,
+                label:                   cfg.label,
+                amount:                  cfg.amount,
+                validateMerchantUrl:     cfg.sessionUrl,
+                validateMerchantParams:  { orderTransactionId: cfg.orderTransactionId },
+
+                onPaymentAuthorized: function (event, session) {
+                    fetch(cfg.authorizeUrl, {
+                        method:      'POST',
+                        headers:     { 'Content-Type': 'application/json' },
+                        credentials: 'same-origin',
+                        body:        JSON.stringify({
+                            providerData:       event.payment.token,
+                            orderTransactionId: cfg.orderTransactionId,
+                            returnUrl:          cfg.returnUrl
+                        })
+                    })
+                    .then(function (res) { return res.json(); })
+                    .then(function (data) {
+                        if (data.success) {
+                            session.completePayment(ApplePaySession.STATUS_SUCCESS);
+                            window.location.href = data.redirectUrl;
+                        } else {
+                            session.completePayment(ApplePaySession.STATUS_FAILURE);
+                            button.style.display = 'block';
+                            showError(data.error || 'Payment failed. Please try again.');
+                        }
+                    })
+                    .catch(function () {
+                        session.completePayment(ApplePaySession.STATUS_FAILURE);
+                        button.style.display = 'block';
+                        showError('Network error during payment processing.');
+                    });
+                },
+
+                onError: function (msg) {
+                    showError(msg);
+                    button.style.display = 'block';
+                },
+
+                onCancel: function () {
+                    button.style.display = 'block';
+                }
+            });
+        }
+    }());
+    </script>
+    {% endblock %}
+</body>
+{% endblock %}
+</html>

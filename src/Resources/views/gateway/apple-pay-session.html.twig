@@ -1,0 +1,92 @@
+{#
+  Shared Apple Pay session helper.
+
+  Wires the ApplePaySession event handlers that are identical regardless of
+  where the session is started from: merchant validation (POST to a caller
+  supplied URL), payment-method reselection, shipping no-ops, and cancel.
+
+  Only `onvalidatemerchant`'s request body and `onpaymentauthorized` differ
+  between entry points (pre-order vs. post-order), so those are left to the
+  caller via `cfg.validateMerchantParams` and `cfg.onPaymentAuthorized`.
+
+  Include this once before calling AltaPayApplePay.runSession(cfg), where
+  cfg is:
+    {
+      countryCode, currencyCode, supportedNetworks (array), label, amount,
+      validateMerchantUrl, validateMerchantParams (plain object, optional),
+      onPaymentAuthorized: function (event, session) {},
+      onError:  function (message) {},
+      onCancel: function () {}
+    }
+#}
+<script>
+window.AltaPayApplePay = window.AltaPayApplePay || {};
+
+AltaPayApplePay.runSession = function (cfg) {
+    'use strict';
+
+    var session = new ApplePaySession(3, {
+        countryCode:          cfg.countryCode,
+        currencyCode:         cfg.currencyCode,
+        merchantCapabilities: ['supports3DS'],
+        supportedNetworks:    cfg.supportedNetworks,
+        total: { label: cfg.label, type: 'final', amount: cfg.amount }
+    });
+
+    session.onvalidatemerchant = function (event) {
+        var body = new URLSearchParams(Object.assign(
+            { validationUrl: event.validationURL },
+            cfg.validateMerchantParams || {}
+        ));
+
+        fetch(cfg.validateMerchantUrl, {
+            method:      'POST',
+            headers:     { 'Content-Type': 'application/x-www-form-urlencoded' },
+            credentials: 'same-origin',
+            body:        body.toString()
+        })
+        .then(function (res) {
+            /* Read as text first — if the server returns an HTML error page, res.json() would throw. */
+            return res.text().then(function (text) {
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    throw new Error('HTTP ' + res.status + ' — non-JSON merchant validation response.');
+                }
+            });
+        })
+        .then(function (data) {
+            if (data.success) {
+                var merchantSession = (typeof data.applePaySession === 'string')
+                    ? JSON.parse(data.applePaySession)
+                    : data.applePaySession;
+                session.completeMerchantValidation(merchantSession);
+            } else {
+                session.abort();
+                cfg.onError(data.error || 'Merchant validation failed.');
+            }
+        })
+        .catch(function (err) {
+            session.abort();
+            cfg.onError(err.message || 'Network error during merchant validation.');
+        });
+    };
+
+    session.onpaymentmethodselected = function () {
+        session.completePaymentMethodSelection({
+            newTotal: { label: cfg.label, type: 'final', amount: cfg.amount }
+        });
+    };
+
+    session.onpaymentauthorized = function (event) {
+        cfg.onPaymentAuthorized(event, session);
+    };
+
+    session.onshippingmethodselected  = function () { session.completeShippingMethodSelection({}); };
+    session.onshippingcontactselected = function () { session.completeShippingContactSelection({}); };
+    session.oncancel = function () { cfg.onCancel && cfg.onCancel(); };
+
+    session.begin();
+    return session;
+};
+</script>
