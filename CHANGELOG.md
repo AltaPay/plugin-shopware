@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+### Fixed
+-  Changing payment method after a failed or cancelled payment opened the payment window of the previously selected method.
+
 ## [2.2.0]
 ### Added
 - Support Apple Pay functionality
