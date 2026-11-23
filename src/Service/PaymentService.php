@@ -65,6 +65,16 @@ class PaymentService extends AbstractPaymentHandler
     public const ALTAPAY_APPLE_PAY_NETWORKS_CUSTOM_FIELD = "wexoAltaPayApplePayNetworks";
     public const ALTAPAY_APPLE_PAY_SESSION_PREFIX = "altapay_apple_pay_checkout_";
     public const ALTAPAY_APPLE_PAY_RESULT_PREFIX = "altapay_apple_pay_data_";
+    public const ALTAPAY_GOOGLE_PAY_IDENTIFIER = "GooglePay";
+    public const ALTAPAY_GOOGLE_PAY_GATEWAY = "marketpay";
+    /** Hidden system config key holding the synced terminal data. */
+    public const ALTAPAY_TERMINAL_DATA_CONFIG_KEY = 'WexoAltaPay.terminalData';
+    private const TERMINAL_DATA_REFRESH_INTERVAL = 600;
+    private const TERMINAL_DATA_MAX_AGE = 86400;
+    private const GOOGLE_PAY_ALLOWED_NETWORKS = ['AMEX', 'DISCOVER', 'INTERAC', 'JCB', 'MASTERCARD', 'VISA'];
+
+    /** @var array<string, array> */
+    private array $terminalsCache = [];
 
     public function __construct(
         protected readonly SystemConfigService $systemConfigService,
@@ -253,6 +263,17 @@ class PaymentService extends AbstractPaymentHandler
             return new RedirectResponse($applePayCheckoutUrl);
         }
 
+        if ($this->isGooglePayTerminal($order->getSalesChannelId(), (string)$terminal)) {
+            return new RedirectResponse($this->router->generate(
+                'altapay.googlepay.checkout',
+                [
+                    'orderTransactionId' => $orderTransactionId,
+                    'returnUrl'          => $transaction->getReturnUrl(),
+                ],
+                UrlGeneratorInterface::ABSOLUTE_URL
+            ));
+        }
+
         try {
             $altaPayResponse = $this->createPaymentRequest(
                 $order,
@@ -397,7 +418,7 @@ class PaymentService extends AbstractPaymentHandler
         $allRequestParams = array_merge($request->query->all(), $request->request->all());
         $xmlString        = $request->get('xml');
 
-        // For Apple Pay payments the XML result is stored in the session
+        // For Apple Pay / Google Pay payments the XML result is stored in the session
         if (empty($xmlString)) {
             $sessionKey = self::ALTAPAY_APPLE_PAY_RESULT_PREFIX . $transaction->getOrderTransactionId();
             try {
@@ -628,6 +649,11 @@ class PaymentService extends AbstractPaymentHandler
     }
 
     public function getAltaPayClient(string $salesChannelId): Client
+    {
+        return $this->buildAltaPayClient($salesChannelId);
+    }
+
+    private function buildAltaPayClient(?string $salesChannelId): Client
     {
         $paymentEnvironment = (string) $this->systemConfigService->get('WexoAltaPay.config.paymentEnvironment', $salesChannelId);
         $shopName = (string) $this->systemConfigService->get('WexoAltaPay.config.shopName', $salesChannelId);
@@ -1098,6 +1124,443 @@ class PaymentService extends AbstractPaymentHandler
         }
 
         return $returnUrl;
+    }
+
+    /**
+     * Order and terminal data plus the Google Pay sheet config for the fallback checkout page.
+     */
+    public function getGooglePayConfig(string $orderTransactionId, Context $context): array
+    {
+        $config = $this->getApplePayConfig($orderTransactionId, $context);
+
+        if (empty($config['terminal'])) {
+            throw new AltaPayException('Google Pay terminal is not configured.');
+        }
+
+        $wallet = $this->getTerminalWalletConfig(
+            $config['salesChannelId'],
+            $config['terminal'],
+            self::ALTAPAY_GOOGLE_PAY_IDENTIFIER
+        );
+
+        if ($this->isGooglePayMerchantMissing($wallet)) {
+            $this->logger->error('AltaPay Google Pay: no merchant ID in the terminal data.', [
+                'terminal' => $config['terminal'],
+                'wallet'   => $wallet,
+            ]);
+            throw new AltaPayException(
+                'Google Pay merchant ID is missing on AltaPay terminal "' . $config['terminal']
+                . '". Check that the terminal has a Google Pay merchant configuration at AltaPay.'
+            );
+        }
+
+        return [
+            'orderTransactionId' => $config['orderTransactionId'],
+            'orderId'            => $config['orderId'],
+            'terminal'           => $config['terminal'],
+            'paymentRequestType' => $config['paymentRequestType'],
+            'amount'             => number_format((float)$config['amount'], 2, '.', ''),
+            'currency'           => $config['currency'],
+            'countryCode'        => $config['countryCode'],
+            'salesChannelId'     => $config['salesChannelId'],
+        ] + $this->buildGooglePayWalletConfig($wallet, $config['applePayLabel']);
+    }
+
+    /**
+     * The merchant ID is only required in production.
+     *
+     * @param array{environment?: string, merchantId?: string} $wallet
+     */
+    private function isGooglePayMerchantMissing(array $wallet): bool
+    {
+        return strtoupper((string)($wallet['environment'] ?? '')) === 'PRODUCTION'
+            && empty($wallet['merchantId']);
+    }
+
+    /**
+     * Google Pay sheet config from a terminal's wallet entry.
+     *
+     * @param array{environment?: string, merchantId?: string, merchantName?: string, schemes?: string[]} $wallet
+     */
+    private function buildGooglePayWalletConfig(array $wallet, string $fallbackName): array
+    {
+        $isProduction = strtoupper((string)($wallet['environment'] ?? '')) === 'PRODUCTION';
+
+        return [
+            'environment'       => $isProduction ? 'PRODUCTION' : 'TEST',
+            'merchantId'        => $isProduction ? (string)($wallet['merchantId'] ?? '') : '',
+            'merchantName'      => (string)($wallet['merchantName'] ?? '') ?: $fallbackName,
+            'gateway'           => self::ALTAPAY_GOOGLE_PAY_GATEWAY,
+            'gatewayMerchantId' => (string)($wallet['merchantId'] ?? ''),
+            'allowedNetworks'   => $this->mapGooglePayNetworks($wallet['schemes'] ?? []),
+            'authMethods'       => ['PAN_ONLY', 'CRYPTOGRAM_3DS'],
+        ];
+    }
+
+    /**
+     * Wallet config of a terminal from the synced AltaPay terminal data.
+     *
+     * @return array{environment: string, merchantId: string, merchantName: string, schemes: string[]}
+     */
+    public function getTerminalWalletConfig(string $salesChannelId, string $terminalName, string $identifier): array
+    {
+        $terminal = $this->loadTerminals($salesChannelId, $terminalName)[$terminalName] ?? null;
+        if ($terminal === null) {
+            throw new AltaPayException('Terminal not found at AltaPay: ' . $terminalName);
+        }
+
+        return ($terminal['wallets'][strtolower($identifier)] ?? ['environment' => '', 'merchantId' => '', 'merchantName' => ''])
+            + ['schemes' => $terminal['schemes']];
+    }
+
+    /**
+     * Whether the terminal's primary method at AltaPay is Google Pay.
+     */
+    public function isGooglePayTerminal(string $salesChannelId, string $terminalName): bool
+    {
+        if ($terminalName === '') {
+            return false;
+        }
+
+        try {
+            $terminal = $this->loadTerminals($salesChannelId, $terminalName)[$terminalName] ?? null;
+
+            if ($terminal === null) {
+                return false;
+            }
+
+            // Primary method decides; the wallet entry is only a fallback when none is reported.
+            if ($terminal['primary'] !== '') {
+                return strcasecmp($terminal['primary'], self::ALTAPAY_GOOGLE_PAY_IDENTIFIER) === 0;
+            }
+
+            return isset($terminal['wallets'][strtolower(self::ALTAPAY_GOOGLE_PAY_IDENTIFIER)]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('AltaPay getTerminals failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Google Pay methods among the given payment methods, with their sheet config.
+     *
+     * @param iterable<\Shopware\Core\Checkout\Payment\PaymentMethodEntity> $paymentMethods
+     * @return array<int, array<string, mixed>>
+     */
+    public function getGooglePayMethods(iterable $paymentMethods, SalesChannelContext $context): array
+    {
+        $methods = [];
+        foreach ($paymentMethods as $method) {
+            if ($method->getHandlerIdentifier() !== self::class) {
+                continue;
+            }
+
+            $customFields = $method->getTranslated()['customFields'] ?? $method->getCustomFields() ?? [];
+            $terminal     = $customFields[self::ALTAPAY_TERMINAL_ID_CUSTOM_FIELD] ?? null;
+            $scTerminal   = $customFields[self::ALTAPAY_SALES_CHANNEL_TERMINAL_ID] ?? null;
+
+            if (!empty($scTerminal)) {
+                $value = $this->systemConfigService->get('WexoAltaPay.config.' . $scTerminal, $context->getSalesChannelId());
+                if (!empty($value)) {
+                    $terminal = $value;
+                }
+            }
+
+            $terminal = (string)$terminal;
+            if (!$this->isGooglePayTerminal($context->getSalesChannelId(), $terminal)) {
+                continue;
+            }
+
+            try {
+                $wallet = $this->getTerminalWalletConfig(
+                    $context->getSalesChannelId(),
+                    $terminal,
+                    self::ALTAPAY_GOOGLE_PAY_IDENTIFIER
+                );
+            } catch (\Throwable $e) {
+                continue;
+            }
+
+            if ($this->isGooglePayMerchantMissing($wallet)) {
+                continue;
+            }
+
+            $methods[] = ['id' => $method->getId()]
+                + $this->buildGooglePayWalletConfig($wallet, (string)($method->getTranslated()['name'] ?? $method->getName()));
+        }
+
+        return $methods;
+    }
+
+    /**
+     * Terminal data keyed by title, read from the stored copy and refreshed when missing or old.
+     *
+     * @return array<string, array{primary: string, wallets: array, schemes: string[]}>
+     */
+    private function loadTerminals(string $salesChannelId, ?string $terminalName = null): array
+    {
+        $key = $salesChannelId;
+        if (isset($this->terminalsCache[$key])) {
+            return $this->terminalsCache[$key];
+        }
+
+        $stored    = $this->systemConfigService->get(self::ALTAPAY_TERMINAL_DATA_CONFIG_KEY, $salesChannelId);
+        $terminals = (($stored['v'] ?? 1) === 2 && is_array($stored['terminals'] ?? null)) ? $stored['terminals'] : null;
+        $fetchedAt   = (int)($stored['fetchedAt'] ?? 0);
+        $attemptedAt = (int)($stored['attemptedAt'] ?? $fetchedAt);
+
+        // Refresh at most once per interval, so a failing gateway is not called on every request.
+        $mayRetry = time() - $attemptedAt > self::TERMINAL_DATA_REFRESH_INTERVAL;
+        $stale    = $terminals === null
+            || ($mayRetry && (
+                ($terminalName !== null && !isset($terminals[$terminalName]))
+                || time() - $fetchedAt > self::TERMINAL_DATA_MAX_AGE
+            ));
+
+        if ($stale) {
+            try {
+                $terminals = $this->refreshTerminalData($salesChannelId);
+            } catch (\Throwable $e) {
+                // Keep the last known data and remember the attempt.
+                $this->logger->warning('AltaPay getTerminals failed: ' . $e->getMessage());
+                $terminals ??= [];
+                $this->systemConfigService->set(
+                    self::ALTAPAY_TERMINAL_DATA_CONFIG_KEY,
+                    ['v' => 2, 'fetchedAt' => $fetchedAt, 'attemptedAt' => time(), 'terminals' => $terminals],
+                    $salesChannelId
+                );
+            }
+        }
+
+        return $this->terminalsCache[$key] = $terminals;
+    }
+
+    /**
+     * First child with the given name, ignoring case.
+     */
+    private function xmlChild(SimpleXMLElement $node, string $name): ?SimpleXMLElement
+    {
+        foreach ($node->children() as $child) {
+            if (strcasecmp($child->getName(), $name) === 0) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
+    private function xmlText(SimpleXMLElement $node, string $name): string
+    {
+        $child = $this->xmlChild($node, $name);
+
+        return $child === null ? '' : trim((string)$child);
+    }
+
+    /**
+     * Fetch the terminals from AltaPay and store them in hidden system config.
+     *
+     * @return array<string, array{primary: string, wallets: array, schemes: string[]}>
+     * @throws GuzzleException
+     */
+    public function refreshTerminalData(?string $salesChannelId = null): array
+    {
+        $response = $this->buildAltaPayClient($salesChannelId)->request('GET', 'getTerminals', ['timeout' => 5, 'connect_timeout' => 3]);
+        $xml      = new SimpleXMLElement($response->getBody()->getContents());
+
+        $terminals = [];
+        foreach ($xml->Body->Terminals->Terminal ?? [] as $terminal) {
+            $primary = $terminal->PrimaryMethod ?? null;
+            $entry   = [
+                'primary' => $primary ? $this->xmlText($primary, 'Identifier') : '',
+                'wallets' => [],
+                'schemes' => [],
+            ];
+
+            $configs = $this->xmlChild($terminal, 'MethodConfigurations');
+            foreach ($configs ? $configs->children() : [] as $methodConfig) {
+                $identifier = strtolower($this->xmlText($methodConfig, 'identifier'));
+                if ($identifier !== '') {
+                    $entry['wallets'][$identifier] = [
+                        'environment'  => $this->xmlText($methodConfig, 'WalletEnvironment'),
+                        'merchantId'   => $this->xmlText($methodConfig, 'MerchantId'),
+                        'merchantName' => $this->xmlText($methodConfig, 'MerchantName'),
+                    ];
+                }
+            }
+
+            $schemes = $this->xmlChild($terminal, 'Schemes');
+            foreach ($schemes ? $schemes->children() : [] as $scheme) {
+                $code = (string)($scheme['code'] ?? '') ?: $this->xmlText($scheme, 'code');
+                if ($code !== '') {
+                    $entry['schemes'][] = $code;
+                }
+            }
+
+            $terminals[$this->xmlText($terminal, 'Title')] = $entry;
+        }
+
+        $this->systemConfigService->set(
+            self::ALTAPAY_TERMINAL_DATA_CONFIG_KEY,
+            ['v' => 2, 'fetchedAt' => time(), 'attemptedAt' => time(), 'terminals' => $terminals],
+            $salesChannelId
+        );
+        $this->terminalsCache = [];
+
+        return $terminals;
+    }
+
+    /**
+     * @param string[] $schemes
+     * @return string[]
+     */
+    private function mapGooglePayNetworks(array $schemes): array
+    {
+        $networks = array_values(array_unique(array_filter(
+            array_map(static fn(string $s) => strtoupper(trim($s)), $schemes),
+            static fn(string $n) => in_array($n, self::GOOGLE_PAY_ALLOWED_NETWORKS, true)
+        )));
+
+        return $networks ?: ['MASTERCARD', 'VISA'];
+    }
+
+    /**
+     * Create the wallet session and authorize the Google Pay token.
+     *
+     * @return array{redirectUrl: string, method: string, data: array<string,string>} Where to send the browser
+     * @throws GuzzleException|AltaPayException
+     */
+    public function processGooglePayPayment(
+        string $orderTransactionId,
+        string $providerData,
+        string $returnUrl,
+        array $browserInfo,
+        Context $context
+    ): array {
+        $config = $this->getGooglePayConfig($orderTransactionId, $context);
+
+        $criteria = new Criteria([$config['orderId']]);
+        $criteria->addAssociation('currency');
+        $criteria->addAssociation('orderCustomer');
+        $order = $this->orderRepository->search($criteria, $context)->first();
+        if (!$order) {
+            throw new AltaPayException('Order not found.');
+        }
+
+        $salesChannelId = $config['salesChannelId'];
+        $amount         = number_format((float)$order->getAmountTotal(), 2, '.', '');
+        $client         = $this->getAltaPayClient($salesChannelId);
+        $callbackConfig = $this->getWalletCallbackConfig($returnUrl);
+
+        $sessionId = $this->checkoutSession(
+            Hasher::hash(['orderId' => $order->getId(), 'orderNumber' => $order->getOrderNumber(), 'wallet' => 'googlepay']),
+            [$config['terminal']],
+            $salesChannelId,
+            $order->getOrderNumber(),
+            (float)$amount,
+            $config['currency'],
+            $config['terminal']
+        );
+        if (!$sessionId) {
+            throw new AltaPayException('Google Pay checkout session could not be created.');
+        }
+
+        $sessionResponse = $client->request('POST', 'cardWallet/session', [
+            'form_params' => [
+                'terminal'      => $config['terminal'],
+                'shop_orderid'  => $order->getOrderNumber(),
+                'amount'        => $amount,
+                'currency'      => $config['currency'],
+                'session_id'    => $sessionId,
+                'config'        => $callbackConfig,
+                'customer_info' => array_filter([
+                    'client_javascript_enabled' => 'true',
+                    'client_screen_width'       => (string)($browserInfo['screenWidth'] ?? ''),
+                    'client_screen_height'      => (string)($browserInfo['screenHeight'] ?? ''),
+                    'client_color_depth'        => (string)($browserInfo['colorDepth'] ?? ''),
+                    'client_timezone'           => (string)($browserInfo['timezone'] ?? ''),
+                    'client_accept'             => (string)($browserInfo['accept'] ?? ''),
+                    'client_java_enabled'       => 'false',
+                    'email'                     => $order->getOrderCustomer()?->getEmail(),
+                ], static fn($v) => $v !== null && $v !== ''),
+            ]
+        ]);
+        $sessionXml = new SimpleXMLElement($sessionResponse->getBody()->getContents());
+        $paymentId  = (string)($sessionXml->Body->Transactions->Transaction->PaymentId ?? '');
+        if ((string)$sessionXml->Body->Result !== 'Success' || $paymentId === '') {
+            throw new AltaPayException(
+                'Google Pay session did not return a payment id: '
+                . ((string)($sessionXml->Body->MerchantErrorMessage ?? $sessionXml->Header->ErrorMessage ?? 'Unknown error'))
+            );
+        }
+
+        $response = $client->request('POST', 'cardWallet/authorize', [
+            'form_params' => [
+                'provider_data' => $providerData,
+                'terminal'      => $config['terminal'],
+                'shop_orderid'  => $order->getOrderNumber(),
+                'amount'        => $amount,
+                'currency'      => $config['currency'],
+                'payment_id'    => $paymentId,
+                'session_id'    => $sessionId,
+                'type'          => $config['paymentRequestType'],
+                'config'        => $callbackConfig,
+            ]
+        ]);
+        $altaPayResponse = new SimpleXMLElement($response->getBody()->getContents());
+        $result          = strtolower((string)($altaPayResponse->Body?->Result ?? ''));
+
+        // 3-D Secure: send the browser to the ACS.
+        if ($result === 'redirect') {
+            $redirect = $altaPayResponse->Body->RedirectResponse;
+            $data     = [];
+            foreach ($redirect->Data ?? [] as $item) {
+                if (isset($item->key)) {
+                    $data[(string)$item->key] = (string)$item->Item;
+                }
+            }
+
+            return [
+                'redirectUrl' => (string)$redirect->Url,
+                'method'      => strtoupper((string)$redirect->Method) === 'POST' ? 'POST' : 'GET',
+                'data'        => $data,
+            ];
+        }
+
+        if (!in_array($result, ['success', 'open'], true)) {
+            throw new AltaPayException(
+                'AltaPay Google Pay payment failed: '
+                . ((string)($altaPayResponse->Body?->MerchantErrorMessage ?? $altaPayResponse->Header?->ErrorMessage ?? 'Unknown error'))
+            );
+        }
+
+        try {
+            $this->requestStack->getSession()->set(self::ALTAPAY_APPLE_PAY_RESULT_PREFIX . $orderTransactionId, [
+                'xml'    => $altaPayResponse->asXML(),
+                'params' => [
+                    'type'            => $config['paymentRequestType'],
+                    'require_capture' => 'false',
+                ],
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->warning('Google Pay: could not store payment result in session: ' . $e->getMessage());
+        }
+
+        return ['redirectUrl' => $returnUrl, 'method' => 'GET', 'data' => []];
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    private function getWalletCallbackConfig(string $returnUrl): array
+    {
+        parse_str((string)parse_url($returnUrl, PHP_URL_QUERY), $params);
+
+        return [
+            'callback_ok'           => $returnUrl,
+            'callback_open'         => $returnUrl,
+            'callback_fail'         => $this->router->generate('altapay.gateway.error', $params, UrlGeneratorInterface::ABSOLUTE_URL),
+            'callback_notification' => $this->router->generate('altapay.gateway.notification', $params, UrlGeneratorInterface::ABSOLUTE_URL),
+        ];
     }
 
     public function getTransaction(OrderEntity $order, string $salesChannelId): ResponseInterface    {

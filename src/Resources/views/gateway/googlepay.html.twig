@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+{% block altapay_googlepay_head %}
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ 'altapay.gateway.title'|trans }}</title>
+
+    <script type="text/javascript" src="https://pay.google.com/gp/p/js/pay.js"></script>
+
+    <style>
+        *,
+        *::before,
+        *::after { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background-color: #f5f5f7;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .googlepay-container {
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.10);
+            padding: 40px 32px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .googlepay-title { font-size: 22px; font-weight: 600; color: #1d1d1f; margin: 0 0 8px; }
+        .googlepay-order-info { font-size: 15px; color: #6e6e73; margin: 0 0 28px; }
+        .googlepay-amount { font-size: 32px; font-weight: 700; color: #1d1d1f; margin: 0 0 32px; }
+
+        #google-pay-button-container { min-height: 52px; }
+        #google-pay-button-container button { width: 100%; }
+
+        .googlepay-unavailable,
+        .googlepay-error {
+            display: none;
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .googlepay-unavailable { background: #fff3cd; border: 1px solid #ffc107; color: #856404; }
+        .googlepay-error { background: #fde8e8; border: 1px solid #f5c6c6; color: #c0392b; }
+
+        .googlepay-back {
+            display: inline-block;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #6e6e73;
+            text-decoration: none;
+        }
+        .googlepay-back:hover { color: #1d1d1f; text-decoration: underline; }
+    </style>
+</head>
+{% endblock %}
+
+{% block altapay_googlepay_body %}
+<body>
+    <div class="googlepay-container">
+        {% block googlepay_title %}
+            <h1 class="googlepay-title">{{ 'altapay.gateway.title'|trans }}</h1>
+        {% endblock %}
+
+        {% block googlepay_order_info %}
+            <p class="googlepay-order-info">
+                {{ 'altapay.gateway.orderNumber'|trans }}: <strong>{{ googlePayData.orderTransactionId|slice(0,8)|upper }}</strong>
+            </p>
+        {% endblock %}
+
+        {% block googlepay_amount %}
+            <p class="googlepay-amount">{{ googlePayData.currency }} {{ googlePayData.amount }}</p>
+        {% endblock %}
+
+        {% block googlepay_button %}
+            <div id="google-pay-button-container"></div>
+            <div id="googlepay-unavailable" class="googlepay-unavailable">
+                Google Pay is not available on this device or browser.
+            </div>
+        {% endblock %}
+
+        {% block googlepay_error %}
+            <div id="googlepay-error" class="googlepay-error"></div>
+        {% endblock %}
+
+        {% block googlepay_back %}
+            <a href="{{ path('frontend.checkout.cart.page') }}" class="googlepay-back">
+                ← {{ 'checkout.finishButtonBackToShop'|trans|striptags }}
+            </a>
+        {% endblock %}
+    </div>
+
+    {% block googlepay_script %}
+    <script>
+    (function () {
+        'use strict';
+
+        var cfg = {
+            orderTransactionId: {{ googlePayData.orderTransactionId|json_encode|raw }},
+            authorizeUrl:       {{ googlePayData.authorizeUrl|json_encode|raw }},
+            returnUrl:          {{ googlePayData.returnUrl|json_encode|raw }},
+            amount:             {{ googlePayData.amount|json_encode|raw }},
+            currency:           {{ googlePayData.currency|json_encode|raw }},
+            country:            {{ googlePayData.countryCode|json_encode|raw }},
+            environment:        {{ googlePayData.environment|json_encode|raw }},
+            merchantId:         {{ googlePayData.merchantId|json_encode|raw }},
+            merchantName:       {{ googlePayData.merchantName|json_encode|raw }},
+            gateway:            {{ googlePayData.gateway|json_encode|raw }},
+            gatewayMerchantId:  {{ googlePayData.gatewayMerchantId|json_encode|raw }},
+            allowedNetworks:    {{ googlePayData.allowedNetworks|json_encode|raw }},
+            authMethods:        {{ googlePayData.authMethods|json_encode|raw }}
+        };
+
+        var container     = document.getElementById('google-pay-button-container');
+        var errorEl       = document.getElementById('googlepay-error');
+        var unavailableEl = document.getElementById('googlepay-unavailable');
+
+        function showError(msg) {
+            errorEl.textContent = msg || 'Payment failed. Please try again.';
+            errorEl.style.display = 'block';
+        }
+
+        function showUnavailable() {
+            container.style.display = 'none';
+            unavailableEl.style.display = 'block';
+        }
+
+        if (typeof google === 'undefined' || !google.payments || !google.payments.api) {
+            showUnavailable();
+            return;
+        }
+
+        var client = new google.payments.api.PaymentsClient({ environment: cfg.environment });
+
+        var baseCardMethod = {
+            type: 'CARD',
+            parameters: {
+                allowedAuthMethods:  cfg.authMethods,
+                allowedCardNetworks: cfg.allowedNetworks
+            }
+        };
+
+        function followRedirect(data) {
+            if (data.method !== 'POST') {
+                window.location.href = data.redirectUrl;
+                return;
+            }
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = data.redirectUrl;
+            Object.keys(data.data || {}).forEach(function (name) {
+                var input = document.createElement('input');
+                input.type  = 'hidden';
+                input.name  = name;
+                input.value = data.data[name];
+                form.appendChild(input);
+            });
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        function authorize(token) {
+            return fetch(cfg.authorizeUrl, {
+                method:      'POST',
+                headers:     { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body:        JSON.stringify({
+                    providerData:       token,
+                    orderTransactionId: cfg.orderTransactionId,
+                    returnUrl:          cfg.returnUrl,
+                    browserInfo: {
+                        screenWidth:  window.screen.width,
+                        screenHeight: window.screen.height,
+                        colorDepth:   window.screen.colorDepth,
+                        timezone:     new Date().getTimezoneOffset()
+                    }
+                })
+            }).then(function (res) { return res.json(); });
+        }
+
+        function pay() {
+            errorEl.style.display = 'none';
+
+            var cardMethod = JSON.parse(JSON.stringify(baseCardMethod));
+            cardMethod.tokenizationSpecification = {
+                type: 'PAYMENT_GATEWAY',
+                parameters: { gateway: cfg.gateway, gatewayMerchantId: cfg.gatewayMerchantId }
+            };
+
+            var merchantInfo = { merchantName: cfg.merchantName };
+            if (cfg.merchantId) { merchantInfo.merchantId = cfg.merchantId; }
+
+            client.loadPaymentData({
+                apiVersion: 2,
+                apiVersionMinor: 0,
+                allowedPaymentMethods: [cardMethod],
+                merchantInfo: merchantInfo,
+                transactionInfo: {
+                    countryCode:      cfg.country,
+                    currencyCode:     cfg.currency,
+                    totalPriceStatus: 'FINAL',
+                    totalPrice:       cfg.amount
+                }
+            }).then(function (paymentData) {
+                container.style.display = 'none';
+                return authorize(paymentData.paymentMethodData.tokenizationData.token);
+            }).then(function (data) {
+                if (data.success) {
+                    followRedirect(data);
+                } else {
+                    container.style.display = 'block';
+                    showError(data.error);
+                }
+            }).catch(function (err) {
+                container.style.display = 'block';
+                if (err && err.statusCode === 'CANCELED') { return; }
+                showError((err && err.statusMessage) || 'Payment failed. Please try again.');
+            });
+        }
+
+        client.isReadyToPay({
+            apiVersion: 2,
+            apiVersionMinor: 0,
+            allowedPaymentMethods: [baseCardMethod]
+        }).then(function (response) {
+            if (!response.result) {
+                showUnavailable();
+                return;
+            }
+            container.appendChild(client.createButton({
+                buttonType:  'pay',
+                buttonSizeMode: 'fill',
+                onClick:     pay
+            }));
+        }).catch(showUnavailable);
+    }());
+    </script>
+    {% endblock %}
+</body>
+{% endblock %}
+</html>
