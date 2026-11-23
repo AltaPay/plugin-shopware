@@ -204,7 +204,9 @@ class PaymentService extends AbstractPaymentHandler
         }
         array_unshift($terminals, $terminal);
 
-        $sessionKey = 'altapay_checkout_session_id_' . $order->getId();
+        // Keyed per terminal: a retry after a failed or cancelled payment may use another payment method,
+        // and reusing the session created for the previous terminal opens the old payment window.
+        $sessionKey = 'altapay_checkout_session_id_' . $order->getId() . '_' . $terminal;
         $altapaySessionId = null;
 
         try {
@@ -217,7 +219,8 @@ class PaymentService extends AbstractPaymentHandler
             $sessionIdentifier = Hasher::hash([
                 'cartToken' => $order->getCustomFieldsValue(WexoAltaPay::ALTAPAY_CART_TOKEN),
                 'orderId' => $order->getId(),
-                'orderNumber' => $order->getOrderNumber()
+                'orderNumber' => $order->getOrderNumber(),
+                'terminal' => $terminal,
             ]);
             $altapaySessionId = $this->checkoutSession(
                 $sessionIdentifier,
