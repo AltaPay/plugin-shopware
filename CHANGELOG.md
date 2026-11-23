@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [2.2.1]
 ### Fixed
 -  Changing payment method after a failed or cancelled payment opened the payment window of the previously selected method.
 
