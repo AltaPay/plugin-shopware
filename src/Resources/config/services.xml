@@ -55,6 +55,8 @@
             <argument type="service" id="payment_method.repository" />
             <argument type="service" id="Shopware\Core\Framework\Plugin\Util\PluginIdProvider" />
             <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService" />
+            <argument type="service" id="Wexo\AltaPay\Service\PaymentService" />
+            <argument type="service" id="logger" />
             <tag name="kernel.event_subscriber" />
         </service>
 
@@ -74,6 +76,11 @@
 
         <service id="Wexo\AltaPay\Subscriber\ApplePayAvailabilitySubscriber">
             <argument type="service" id="request_stack"/>
+            <tag name="kernel.event_subscriber"/>
+        </service>
+
+        <service id="Wexo\AltaPay\Subscriber\GooglePayAvailabilitySubscriber">
+            <argument type="service" id="Wexo\AltaPay\Service\PaymentService"/>
             <tag name="kernel.event_subscriber"/>
         </service>
 

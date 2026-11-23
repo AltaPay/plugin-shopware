@@ -201,4 +201,208 @@
     }());
     </script>
     {% endif %}
+
+    {# Google Pay: open the sheet on place order, create the order after authorisation. #}
+    {% set altapayGoogleMethods = page.extensions.altapayGooglePay.methods ?? [] %}
+
+    {% if altapayGoogleMethods is not empty %}
+    <script type="text/javascript" src="https://pay.google.com/gp/p/js/pay.js"></script>
+    <script>
+    (function () {
+        'use strict';
+
+        var GOOGLE_PAY_METHODS = {{ altapayGoogleMethods|json_encode|raw }};
+        var AUTHORIZE_URL      = '{{ path('altapay.googlepay.authorize') }}';
+        var CART_TOTAL         = '{{ page.cart.price.totalPrice|number_format(2, '.', '') }}';
+        var CURRENCY_ISO       = {{ context.currency.isoCode|json_encode|raw }};
+        var COUNTRY_CODE       = {{ (context.shippingLocation.country.iso ?? 'DK')|json_encode|raw }};
+
+        var googlePayMap = {};
+        var clients      = {};
+        GOOGLE_PAY_METHODS.forEach(function (m) { googlePayMap[m.id] = m; });
+
+        function getClient(config) {
+            if (!clients[config.environment]) {
+                clients[config.environment] = new google.payments.api.PaymentsClient({ environment: config.environment });
+            }
+            return clients[config.environment];
+        }
+
+        function baseCardMethod(config) {
+            return {
+                type: 'CARD',
+                parameters: {
+                    allowedAuthMethods:  config.authMethods,
+                    allowedCardNetworks: config.allowedNetworks
+                }
+            };
+        }
+
+        function hideMethod(id) {
+            var el = document.querySelector('input[name="paymentMethodId"][value="' + id + '"]');
+            if (el) {
+                var row = el.closest('.payment-method') || el.closest('label') || el.parentElement;
+                if (row) { row.style.display = 'none'; }
+            }
+        }
+
+        function showError(form, msg) {
+            var el = document.getElementById('altapay-googlepay-error');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'altapay-googlepay-error';
+                el.className = 'alert alert-danger';
+                form.parentNode.insertBefore(el, form);
+            }
+            el.textContent = msg || 'Payment failed. Please try again.';
+        }
+
+        function followRedirect(data) {
+            if (data.method !== 'POST') {
+                window.location.href = data.redirectUrl;
+                return;
+            }
+            var f = document.createElement('form');
+            f.method = 'POST';
+            f.action = data.redirectUrl;
+            Object.keys(data.data || {}).forEach(function (name) {
+                var input = document.createElement('input');
+                input.type  = 'hidden';
+                input.name  = name;
+                input.value = data.data[name];
+                f.appendChild(input);
+            });
+            document.body.appendChild(f);
+            f.submit();
+        }
+
+        /* Hide methods this browser/Google account cannot pay with. */
+        function checkAvailability() {
+            GOOGLE_PAY_METHODS.forEach(function (m) {
+                if (typeof google === 'undefined' || !google.payments || !google.payments.api) {
+                    hideMethod(m.id);
+                    return;
+                }
+                getClient(m).isReadyToPay({
+                    apiVersion: 2,
+                    apiVersionMinor: 0,
+                    allowedPaymentMethods: [baseCardMethod(m)]
+                }).then(function (r) { if (!r.result) { hideMethod(m.id); } })
+                  .catch(function () { hideMethod(m.id); });
+            });
+        }
+
+        function findForm() {
+            var form = document.getElementById('confirmOrderForm')
+                    || document.querySelector('[data-form-csrf-handler] form')
+                    || document.querySelector('form[action*="checkout/order"]')
+                    || document.querySelector('form[action*="order/confirm"]');
+            if (!form) {
+                var btn = document.querySelector('[data-form-submit-loader]')
+                       || document.querySelector('button[form="confirmOrderForm"]');
+                if (btn) { form = btn.closest('form'); }
+            }
+            return form;
+        }
+
+        function getSelectedPaymentMethodId() {
+            var checked = document.querySelector('input[name="paymentMethodId"]:checked')
+                       || document.querySelector('.payment-method-input:checked');
+            return checked ? checked.value : null;
+        }
+
+        function init() {
+            checkAvailability();
+
+            var form = findForm();
+            if (!form || typeof google === 'undefined' || !google.payments || !google.payments.api) { return; }
+
+            /* useCapture:true so this runs before Shopware's own submit handlers */
+            form.addEventListener('submit', function (e) {
+                var pmId   = getSelectedPaymentMethodId();
+                var config = pmId ? googlePayMap[pmId] : null;
+                if (!config) { return; } /* not Google Pay: let Shopware handle it */
+
+                e.preventDefault();
+                e.stopImmediatePropagation();
+
+                var cardMethod = baseCardMethod(config);
+                cardMethod.tokenizationSpecification = {
+                    type: 'PAYMENT_GATEWAY',
+                    parameters: { gateway: config.gateway, gatewayMerchantId: config.gatewayMerchantId }
+                };
+
+                var merchantInfo = { merchantName: config.merchantName };
+                if (config.merchantId) { merchantInfo.merchantId = config.merchantId; }
+
+                /* loadPaymentData() must be called inside this submit handler (user gesture). */
+                getClient(config).loadPaymentData({
+                    apiVersion: 2,
+                    apiVersionMinor: 0,
+                    allowedPaymentMethods: [cardMethod],
+                    merchantInfo: merchantInfo,
+                    transactionInfo: {
+                        countryCode:      COUNTRY_CODE,
+                        currencyCode:     CURRENCY_ISO,
+                        totalPriceStatus: 'FINAL',
+                        totalPrice:       CART_TOTAL
+                    }
+                }).then(function (paymentData) {
+                    var token = paymentData.paymentMethodData.tokenizationData.token;
+
+                    /* Authorised: create the order. Its payment redirect carries the transaction. */
+                    return fetch(form.action, {
+                        method:      'POST',
+                        credentials: 'same-origin',
+                        redirect:    'follow',
+                        body:        new FormData(form)
+                    }).then(function (resp) {
+                        var finalUrl           = new URL(resp.url, window.location.origin);
+                        var orderTransactionId = finalUrl.searchParams.get('orderTransactionId');
+                        var returnUrl          = finalUrl.searchParams.get('returnUrl');
+
+                        if (!orderTransactionId || !returnUrl) {
+                            throw new Error('Order creation failed.');
+                        }
+
+                        return fetch(AUTHORIZE_URL, {
+                            method:      'POST',
+                            credentials: 'same-origin',
+                            headers:     { 'Content-Type': 'application/json' },
+                            body:        JSON.stringify({
+                                providerData:       token,
+                                orderTransactionId: orderTransactionId,
+                                returnUrl:          returnUrl,
+                                browserInfo: {
+                                    screenWidth:  window.screen.width,
+                                    screenHeight: window.screen.height,
+                                    colorDepth:   window.screen.colorDepth,
+                                    timezone:     new Date().getTimezoneOffset()
+                                }
+                            })
+                        });
+                    });
+                }).then(function (r) { return r.json(); })
+                  .then(function (data) {
+                      if (data.success) {
+                          followRedirect(data);
+                      } else {
+                          showError(form, data.error);
+                      }
+                  })
+                  .catch(function (err) {
+                      if (err && err.statusCode === 'CANCELED') { return; }
+                      showError(form, (err && (err.statusMessage || err.message)) || null);
+                  });
+            }, true);
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    }());
+    </script>
+    {% endif %}
 {% endblock %}

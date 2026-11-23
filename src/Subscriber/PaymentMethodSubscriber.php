@@ -11,6 +11,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenEvent;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsAnyFilter;
 use Shopware\Core\Framework\Plugin\Util\PluginIdProvider;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Wexo\AltaPay\Service\PaymentService;
 use Wexo\AltaPay\WexoAltaPay;
@@ -18,13 +19,17 @@ use Shopware\Core\System\SystemConfig\SystemConfigService;
 
 class PaymentMethodSubscriber implements EventSubscriberInterface
 {
+    private bool $terminalDataSynced = false;
+
     /**
      * @param EntityRepository<PaymentMethodCollection> $paymentMethodRepository
      */
     public function __construct(
         protected EntityRepository $paymentMethodRepository,
         protected PluginIdProvider $pluginIdProvider,
-        protected SystemConfigService $systemConfigService
+        protected SystemConfigService $systemConfigService,
+        protected PaymentService $paymentService,
+        protected LoggerInterface $logger
     ) {
     }
 
@@ -48,6 +53,7 @@ class PaymentMethodSubscriber implements EventSubscriberInterface
         $paymentMethods = $this->paymentMethodRepository->search($criteria, $event->getContext())->getEntities();
 
         $paymentMethodsPayload = [];
+        $hasAltaPayMethod      = false;
 
         /** @var PaymentMethodEntity $paymentMethod */
         foreach ($paymentMethods as $paymentMethod) {
@@ -63,6 +69,7 @@ class PaymentMethodSubscriber implements EventSubscriberInterface
             }
 
             if ($paymentMethod->getCustomFieldsValue(PaymentService::ALTAPAY_TERMINAL_ID_CUSTOM_FIELD) || $salesChannelTerminalValue) {
+                $hasAltaPayMethod = true;
                 $payload['handlerIdentifier'] = PaymentService::class;
                 $payload['pluginId'] = $this->pluginIdProvider->getPluginIdByBaseClass(
                     WexoAltaPay::class,
@@ -79,5 +86,26 @@ class PaymentMethodSubscriber implements EventSubscriberInterface
         }
 
         $this->paymentMethodRepository->upsert($paymentMethodsPayload, $event->getContext());
+
+        if ($hasAltaPayMethod) {
+            $this->syncTerminalData();
+        }
+    }
+
+    /**
+     * Sync terminal data from AltaPay; a failure must not block saving.
+     */
+    private function syncTerminalData(): void
+    {
+        if ($this->terminalDataSynced) {
+            return;
+        }
+        $this->terminalDataSynced = true;
+
+        try {
+            $this->paymentService->refreshTerminalData();
+        } catch (\Throwable $e) {
+            $this->logger->warning('AltaPay terminal data sync failed: ' . $e->getMessage());
+        }
     }
 }

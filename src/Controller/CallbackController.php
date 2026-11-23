@@ -363,4 +363,98 @@ class CallbackController
             return new JsonResponse(['success' => false, 'error' => 'Payment processing failed: ' . $e->getMessage()]);
         }
     }
+
+    /**
+     * Google Pay checkout page (fallback when the sheet was not opened on the confirm page).
+     */
+    #[Route(
+        path: '/altapay/googlepay/checkout',
+        name: 'altapay.googlepay.checkout',
+        defaults: ['auth_required' => false],
+        methods: ['GET']
+    )]
+    public function googlePayCheckout(Request $request, SalesChannelContext $salesChannelContext): Response
+    {
+        $orderTransactionId = $request->get('orderTransactionId');
+        $returnUrl          = $request->get('returnUrl');
+
+        if (!$orderTransactionId || !$returnUrl) {
+            return new Response('Missing orderTransactionId or returnUrl', 400);
+        }
+
+        if (!$this->isSameHostUrl($returnUrl, $request)) {
+            return new Response('Invalid returnUrl', 400);
+        }
+
+        try {
+            $config = $this->paymentService->getGooglePayConfig($orderTransactionId, $salesChannelContext->getContext());
+        } catch (\Throwable $e) {
+            $this->logger->error('Google Pay checkout config error: ' . $e->getMessage());
+            return new Response('Error loading payment data: ' . $e->getMessage(), 500);
+        }
+
+        $config['returnUrl']    = $returnUrl;
+        $config['authorizeUrl'] = $this->router->generate('altapay.googlepay.authorize', [], UrlGeneratorInterface::ABSOLUTE_URL);
+
+        return $this->renderTemplate(
+            '@WexoAltaPay/gateway/googlepay.html.twig',
+            ['googlePayData' => $config]
+        );
+    }
+
+    /**
+     * Authorize a Google Pay token.
+     */
+    #[Route(
+        path: '/altapay/googlepay/authorize',
+        name: 'altapay.googlepay.authorize',
+        defaults: ['auth_required' => false, 'csrf_protected' => false],
+        methods: ['POST']
+    )]
+    public function googlePayAuthorize(Request $request, SalesChannelContext $salesChannelContext): Response
+    {
+        $data = json_decode($request->getContent(), true);
+
+        $orderTransactionId = $data['orderTransactionId'] ?? null;
+        $providerData       = $data['providerData'] ?? null;
+        $returnUrl          = $data['returnUrl'] ?? null;
+
+        if (!$orderTransactionId || $providerData === null || !$returnUrl) {
+            return new JsonResponse(['success' => false, 'error' => self::ERROR_MISSING_PARAMETERS], 400);
+        }
+
+        if (!is_string($returnUrl) || !$this->isSameHostUrl($returnUrl, $request)) {
+            return new JsonResponse(['success' => false, 'error' => 'Invalid returnUrl'], 400);
+        }
+
+        $browserInfo = is_array($data['browserInfo'] ?? null) ? $data['browserInfo'] : [];
+        $browserInfo['accept'] = $request->headers->get('Accept', '');
+
+        try {
+            $result = $this->paymentService->processGooglePayPayment(
+                $orderTransactionId,
+                is_string($providerData) ? $providerData : json_encode($providerData),
+                $returnUrl,
+                $browserInfo,
+                $salesChannelContext->getContext()
+            );
+            return new JsonResponse(['success' => true] + $result);
+        } catch (GuzzleException $e) {
+            $this->logger->error('Google Pay authorize network error: ' . $e->getMessage());
+            return new JsonResponse(['success' => false, 'error' => 'Network error during payment processing.']);
+        } catch (\Exception $e) {
+            $this->logger->error('Google Pay authorize error: ' . $e->getMessage());
+            return new JsonResponse(['success' => false, 'error' => 'Payment processing failed.']);
+        }
+    }
+
+    /**
+     * Only accept return URLs on this shop's host.
+     */
+    private function isSameHostUrl(string $url, Request $request): bool
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+
+        return is_string($host) && strcasecmp($host, $request->getHost()) === 0;
+    }
 }
