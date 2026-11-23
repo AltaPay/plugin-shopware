@@ -184,7 +184,9 @@ class PaymentService extends AbstractPaymentHandler
             ]
         );
 
-        $paymentMethod = $salesChannelContext->getPaymentMethod();
+        $paymentMethod = $this->container->get('payment_method.repository')
+            ->search(new Criteria([$orderTransaction->getPaymentMethodId()]), $context)
+            ->first() ?? $salesChannelContext->getPaymentMethod();
         $terminal = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_TERMINAL_ID_CUSTOM_FIELD] ?? null;
         $salesChannelTerminal = $paymentMethod->getTranslated()['customFields'][self::ALTAPAY_SALES_CHANNEL_TERMINAL_ID] ?? null;
 
